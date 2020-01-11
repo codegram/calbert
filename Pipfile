@@ -4,8 +4,6 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-black = "*"
-flake8 = "*"
 spell = "*"
 wandb = "*"
 pytest = "*"
@@ -21,6 +19,3 @@ tokenizers = "==0.1.0"
 
 [requires]
 python_version = "3.7.5"
-
-[pipenv]
-allow_prereleases = true
