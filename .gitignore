@@ -1,0 +1,8 @@
+.venv
+__pycache__
+.vscode/.ropeproject/objectdb
+out
+outputs
+*.model
+*.vocab
+run/

@@ -1,0 +1,32 @@
+data:
+  dedup: True
+  subset: False
+  subset_size: 22000
+  chunk_size_lines: 10000
+  chunk_name_size: 55
+  valid_split: 0.1
+  # 13200000 / chunk_size_lines / 26 =~ chunk_name_size
+
+vocab:
+  size: 25000
+  min_frequency: 2
+
+pretraining:
+  config: tiny
+  lower_case: False
+  max_seq_length: 512
+  max_predictions_per_seq: 20
+  masked_lm_prob: 0.10
+  whole_word_masking: True
+  train_batch_size: 4096
+  eval_batch_size: 64
+  num_train_steps: 125000
+  num_warmup_steps: 3125
+  save_checkpoints_steps: 5000
+
+defaults:
+  - hydra/job_logging: colorlog
+
+hydra:
+  run:
+    dir: run
