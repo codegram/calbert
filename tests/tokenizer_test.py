@@ -36,17 +36,15 @@ class TestTrainTokenizer:
                 cfg = OmegaConf.from_dotlist(config)
                 tok, vocab_size = tokenizer.train(args, cfg)
 
-                assert vocab_size == 56
-                assert tok.id_to_token(0) == "[UNK]"
-                assert tok.id_to_token(1) == "[SEP]"
-                assert tok.id_to_token(2) == "[CLS]"
+                assert vocab_size == 34
+                assert tok.id_to_token(0) == "<unk>"
 
                 example = (
                     "No tinc una massa ampla tessitura, encara que s'ha cuit en caça"
                 )
                 encoded = tok.encode(example)
 
-                assert encoded.tokens[0] == "n"
-                assert encoded.tokens[1] == "##o"
-
-                assert glob.glob(outdir + "/*")[0] == outdir + "/ca.bert.56-vocab.txt"
+                assert glob.glob(outdir + "/*") == [
+                    outdir + "/ca.bpe.34-vocab.json",
+                    outdir + "/ca.bpe.34-merges.txt",
+                ]

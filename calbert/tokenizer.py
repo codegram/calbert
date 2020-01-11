@@ -3,7 +3,7 @@ import argparse
 from pathlib import Path
 
 from tokenizers import (
-    BertWordPieceTokenizer,
+    SentencePieceBPETokenizer,
     Tokenizer,
 )
 
@@ -20,17 +20,19 @@ def arguments() -> argparse.ArgumentParser:
 def train(args, cfg) -> (Tokenizer, int):
     log.info(f"Training tokenizer: {args}")
 
-    tokenizer = BertWordPieceTokenizer(
-        strip_accents=False, lowercase=cfg.vocab.lowercase
+    tokenizer = SentencePieceBPETokenizer()
+
+    tokenizer.train(
+        [str(args.input_file.absolute())],
+        vocab_size=cfg.vocab.size,
+        min_frequency=cfg.vocab.min_frequency,
     )
 
-    tokenizer.train([str(args.input_file.absolute())], vocab_size=cfg.vocab.size)
-
     vocab_size = tokenizer._tokenizer.get_vocab_size()
-    tokenizer.save(str(args.out_dir.absolute()), f"ca.bert.{vocab_size}")
+    tokenizer.save(str(args.out_dir.absolute()), f"ca.bpe.{vocab_size}")
 
     log.info(
-        f"Saved tokenizer as {args.out_dir.absolute()}/ca.bert.{vocab_size}-vocab.txt"
+        f"Saved tokenizer as {args.out_dir.absolute()}/ca.bpe.{vocab_size}-vocab.txt"
     )
 
     return tokenizer, vocab_size
