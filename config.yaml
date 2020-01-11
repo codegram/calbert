@@ -8,8 +8,9 @@ data:
   # 13200000 / chunk_size_lines / 26 =~ chunk_name_size
 
 vocab:
-  size: 25000
+  size: 30000
   min_frequency: 2
+  lowercase: True
 
 pretraining:
   config: tiny

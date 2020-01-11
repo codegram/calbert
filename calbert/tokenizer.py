@@ -19,7 +19,6 @@ def arguments() -> argparse.ArgumentParser:
 
 def train(args, cfg) -> (Tokenizer, int):
     log.info(f"Training tokenizer: {args}")
-    log.info(cfg.pretty())
 
     tokenizer = BertWordPieceTokenizer(
         strip_accents=False, lowercase=cfg.vocab.lowercase
