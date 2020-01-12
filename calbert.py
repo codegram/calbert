@@ -4,16 +4,16 @@ import sys
 import argparse
 from pathlib import Path
 
-from calbert import tokenizer
+from calbert import tokenizer, training
 
 log = logging.getLogger(__name__)
 
 TASK_WITH_ARGS = (None, None)
 
-VALID_COMMANDS = ["tokenizer"]
+VALID_COMMANDS = ["tokenizer", "train"]
 
-TASKS = {"tokenizer": tokenizer.train}
-PARSERS = {"tokenizer": tokenizer.arguments}
+TASKS = {"tokenizer": tokenizer.train, "train": training.train}
+PARSERS = {"tokenizer": tokenizer.arguments, "train": training.arguments}
 
 
 def parse(command):
@@ -25,7 +25,7 @@ def parse(command):
     return args, override
 
 
-@hydra.main(config_path="config.yaml", strict=True)
+@hydra.main(config_path="config/config.yaml", strict=True)
 def main(cfg):
     task, args = TASK_WITH_ARGS
     task(args, cfg)

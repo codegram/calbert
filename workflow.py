@@ -32,7 +32,7 @@ def download_data(cfg):
     return (r, f"runs/{r.id}/data.txt.gz")
 
 
-def create_pretraining_data(
+def splitting_dataset(
     cfg, data_cfg, raw_data_path, forced_run_id=None,
 ):
     if forced_run_id:
@@ -74,9 +74,7 @@ def main(cfg):
     raw_data_run, raw_data_path = download_data(cfg.data)
     wait(raw_data_run)
 
-    data_run, data_path = create_pretraining_data(
-        cfg.pretraining, cfg.data, raw_data_path,
-    )
+    data_run, data_path = splitting_dataset(cfg.training, cfg.data, raw_data_path,)
     wait(data_run)
 
     vocab_run, vocab_path = create_tokenizer(cfg, data_path)

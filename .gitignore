@@ -6,3 +6,6 @@ outputs
 *.model
 *.vocab
 run/
+runs/
+*.txt
+tokenizer/
