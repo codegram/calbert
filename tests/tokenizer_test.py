@@ -43,10 +43,17 @@ class TestTrainTokenizer:
                 assert tok.id_to_token(3) == "[SEP]"
                 assert tok.id_to_token(4) == "[CLS]"
 
-                encoded = tok.encode("hola com anem")
+                encoded = tok.process("hola com anem")
 
                 assert tok.id_to_token(encoded.ids[0]) == "[CLS]"
                 assert tok.id_to_token(encoded.ids[-1]) == "[SEP]"
+
+                encoded = tok.process("hola com anem", max_seq_len=12)
+                assert encoded.tokens[-1] == "a"
+                print(encoded)
+
+                encoded = tok.process("hola com anem", max_seq_len=100)
+                assert encoded.tokens[-1] == "<pad>"
 
                 assert glob.glob(outdir + "/*") == [
                     outdir + "/ca.bpe.38-vocab.json",

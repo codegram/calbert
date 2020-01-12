@@ -115,6 +115,13 @@ class CalbertTokenizer(BaseTokenizer):
     def get_special_tokens_mask(self, ids):
         return [1 if self.is_special_token(t) else 0 for t in ids]
 
+    def process(self, sequence, max_seq_len: int = 0):
+        enc = self.encode(sequence)
+        if max_seq_len > 0:
+            enc.pad(max_seq_len, pad_token="<pad>", pad_id=self.pad_token_id)
+            enc.truncate(max_seq_len)
+        return enc
+
 
 def arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train a tokenizer on some raw text")

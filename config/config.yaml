@@ -28,6 +28,7 @@ training:
   weight_decay: 0.0
   learning_rate: 5e-5
   adam_epsilon: 1e-8
+  max_grad_norm: 1.0
 
 defaults:
   - model: tiny

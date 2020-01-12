@@ -18,7 +18,8 @@
         "--eval-file",
         "$PWD/valid.txt",
         "--out-dir",
-        "testy"
+        "testy",
+        "training.max_seq_length=64"
       ],
       "console": "integratedTerminal"
     }

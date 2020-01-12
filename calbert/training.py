@@ -43,14 +43,15 @@ class TextDataset(Dataset):
             open(file_path, encoding="utf-8"), desc="Tokenizing", total=num_lines
         )
         for line in input_text:
-            ids = tokenizer.encode(line.strip(), seq_len=max_seq_length)
-            self.examples.append(ids)
+            encoded = tokenizer.process(line.strip(), max_seq_len=max_seq_length)
+            self.examples.append(encoded)
 
     def __len__(self):
         return len(self.examples)
 
     def __getitem__(self, item):
-        return torch.tensor(self.examples[item])
+        encoding = self.examples[item]
+        return torch.tensor(encoding.ids), torch.tensor(encoding.attention_mask), torch.tensor(encoding.type_ids)
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -172,15 +173,18 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     model.eval()
 
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
+        inputs, attention_masks, token_type_ids = batch
         inputs, labels = (
-            mask_tokens(batch, tokenizer, args)
+            mask_tokens(inputs, tokenizer, args)
         )
         inputs = inputs.to(device)
         labels = labels.to(device)
+        attention_masks = attention_masks.to(device)
+        token_type_ids = token_type_ids.to(device)
 
         with torch.no_grad():
             outputs = (
-                model(inputs, masked_lm_labels=labels)
+                model(inputs, masked_lm_labels=labels, attention_mask=attention_masks, token_type_ids=token_type_ids)
             )
             lm_loss = outputs[0]
             eval_loss += lm_loss.mean().item()
@@ -433,20 +437,18 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                 steps_trained_in_current_epoch -= 1
                 continue
 
+            inputs, attention_masks, token_type_ids = batch
             inputs, labels = (
-                mask_tokens(batch, tokenizer, cfg)
+                mask_tokens(inputs, tokenizer, cfg)
             )
             inputs = inputs.to(device)
             labels = labels.to(device)
-
-            print(inputs.shape)
-            print(labels.shape)
-            log.info(inputs.shape)
-            log.info(labels.shape)
+            attention_masks = attention_masks.to(device)
+            token_type_ids = token_type_ids.to(device)
 
             model.train()
             outputs = (
-                model(inputs, masked_lm_labels=labels)
+                model(inputs, masked_lm_labels=labels, attention_mask=attention_masks, token_type_ids=token_type_ids)
             )
             loss = outputs[
                 0
@@ -454,8 +456,8 @@ def _train(args, cfg, dataset, model, tokenizer, device):
 
             if args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
-            if args.gradient_accumulation_steps > 1:
-                loss = loss / args.gradient_accumulation_steps
+            if gradient_accumulation_steps > 1:
+                loss = loss / gradient_accumulation_steps
 
             if args.fp16:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -464,14 +466,14 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                 loss.backward()
 
             tr_loss += loss.item()
-            if (step + 1) % args.gradient_accumulation_steps == 0:
+            if (step + 1) % gradient_accumulation_steps == 0:
                 if args.fp16:
                     torch.nn.utils.clip_grad_norm_(
-                        amp.master_params(optimizer), args.max_grad_norm
+                        amp.master_params(optimizer), cfg.training.max_grad_norm
                     )
                 else:
                     torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), args.max_grad_norm
+                        model.parameters(), cfg.training.max_grad_norm
                     )
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
@@ -485,7 +487,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                 ):
                     # Log metrics
                     if (
-                        args.local_rank == -1 and args.evaluate_during_training
+                        args.local_rank == -1
                     ):  # Only evaluate when single GPU otherwise metrics may not average well
                         results = evaluate(args, cfg, model, tokenizer, device)
                         for key, value in results.items():
@@ -531,10 +533,10 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                     )
                     log.info("Saving optimizer and scheduler states to %s", output_dir)
 
-            if args.max_steps > 0 and global_step > args.max_steps:
+            if cfg.training.num_train_steps > 0 and global_step > cfg.training.num_train_steps:
                 epoch_iterator.close()
                 break
-        if args.max_steps > 0 and global_step > args.max_steps:
+        if cfg.training.num_train_steps > 0 and global_step > cfg.training.num_train_steps:
             train_iterator.close()
             break
 
