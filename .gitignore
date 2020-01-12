@@ -9,3 +9,5 @@ run/
 runs/
 *.txt
 tokenizer/
+wandb/
+*.pkl

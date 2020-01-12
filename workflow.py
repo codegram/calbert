@@ -55,7 +55,11 @@ def splitting_dataset(
     return (r, f"runs/{r.id}/dataset")
 
 
-def create_tokenizer(cfg, data_path):
+def create_tokenizer(cfg, data_path, forced_run_id=None):
+    if forced_run_id:
+        log.info(f"[{forced_run_id}] Training tokenizer... (forcedly cached)")
+        return (None, f"runs/{forced_run_id}/tokenizer")
+
     r = client.runs.new(
         command="mkdir -p /spell/tokenizer && python calbert.py tokenizer --input-file /spell/train.txt --out-dir /spell/tokenizer",
         commit_label="repo",
@@ -69,17 +73,55 @@ def create_tokenizer(cfg, data_path):
     return (r, f"runs/{r.id}/tokenizer")
 
 
-@hydra.main(config_path="config.yaml", strict=True)
+def train_model(cfg, data_path, tokenizer_path):
+    r = client.runs.new(
+        command=" ".join(
+            [
+                "python",
+                "calbert.py",
+                "train",
+                "--tokenizer-dir",
+                "$PWD/tokenizer",
+                "--train-file",
+                "$PWD/train.txt",
+                "--eval-file",
+                "$PWD/valid.txt",
+                "--out-dir",
+                "model",
+                "--tensorboard-dir",
+                "tensorboard",
+            ]
+        ),
+        tensorboard_directory="tensorboard",
+        commit_label="repo",
+        machine_type="v100",
+        pip_packages=packages,
+        attached_resources={
+            f"{data_path}/train.txt": "train.txt",
+            f"{data_path}/valid.txt": "valid.txt",
+            tokenizer_path: "tokenizer",
+        },
+        idempotent=True,
+    )
+    log.info(
+        f"[{r.id}] Training model... ({'cached' if r.already_existed else 'running'})"
+    )
+    return (r, f"runs/{r.id}/model")
+
+
+@hydra.main(config_path="config/config.yaml", strict=True)
 def main(cfg):
     raw_data_run, raw_data_path = download_data(cfg.data)
     wait(raw_data_run)
 
-    data_run, data_path = splitting_dataset(cfg.training, cfg.data, raw_data_path,)
+    data_run, data_path = splitting_dataset(cfg.training, cfg.data, raw_data_path)
     wait(data_run)
 
-    vocab_run, vocab_path = create_tokenizer(cfg, data_path)
+    tokenizer_run, tokenizer_path = create_tokenizer(cfg, data_path, forced_run_id=207)
+    wait(tokenizer_run)
 
-    wait(vocab_run, logs=True)
+    model_run, model_path = train_model(cfg, data_path, tokenizer_path)
+    wait(model_run, logs=True)
 
 
 if __name__ == "__main__":

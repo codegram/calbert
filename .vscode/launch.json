@@ -19,7 +19,8 @@
         "$PWD/valid.txt",
         "--out-dir",
         "testy",
-        "training.max_seq_length=64"
+        "--tensorboard-dir",
+        "tensortest"
       ],
       "console": "integratedTerminal"
     }

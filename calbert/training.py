@@ -14,6 +14,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
+import wandb
 
 from transformers import (
     AlbertConfig,
@@ -31,27 +32,48 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+wandb.init(project='calbert', sync_tensorboard=True)
+
 
 class TextDataset(Dataset):
-    def __init__(self, tokenizer, file_path, max_seq_length):
+    def __init__(self, tokenizer, file_path, model_name, max_seq_length):
         assert os.path.isfile(file_path)
-        log.info("Tokenizing dataset file at %s", file_path)
-
-        self.examples = []
-        num_lines = sum(1 for line in open(file_path, "r"))
-        input_text = tqdm(
-            open(file_path, encoding="utf-8"), desc="Tokenizing", total=num_lines
+        directory, filename = os.path.split(file_path)
+        cached_features_file = os.path.join(
+            directory,
+            model_name + "_cached_lm_" + str(max_seq_length) + "_" + filename + '.pkl',
         )
-        for line in input_text:
-            encoded = tokenizer.process(line.strip(), max_seq_len=max_seq_length)
-            self.examples.append(encoded)
+       
+        if os.path.exists(cached_features_file):
+            log.info("Loading features from cached file %s", cached_features_file)
+            with open(cached_features_file, "rb") as handle:
+                self.examples = pickle.load(handle)
+        else:
+            log.info("Tokenizing dataset file at %s", file_path)
+
+            self.examples = []
+            num_lines = sum(1 for line in open(file_path, "r"))
+            input_text = tqdm(
+                open(file_path, encoding="utf-8"), desc="Tokenizing", total=num_lines
+            )
+            for line in input_text:
+                encoded = tokenizer.process(line.strip(), max_seq_len=max_seq_length)
+                self.examples.append((encoded.ids, encoded.attention_mask, encoded.type_ids))
+
+            log.info("Saving features into cached file %s", cached_features_file)
+            with open(cached_features_file, "wb") as handle:
+                pickle.dump(self.examples, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def __len__(self):
         return len(self.examples)
 
     def __getitem__(self, item):
-        encoding = self.examples[item]
-        return torch.tensor(encoding.ids), torch.tensor(encoding.attention_mask), torch.tensor(encoding.type_ids)
+        (ids, att_mask, type_ids) = self.examples[item]
+        return (
+            torch.tensor(ids),
+            torch.tensor(att_mask),
+            torch.tensor(type_ids),
+        )
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -81,6 +103,13 @@ def arguments() -> argparse.ArgumentParser:
         required=True,
         help="The output directory where the model predictions and checkpoints will be written.",
     )
+    parser.add_argument(
+        "--tensorboard-dir",
+        default=None,
+        type=str,
+        required=True,
+        help="The output directory where the tensorboard logs will be written to.",
+    )
 
     parser.add_argument(
         "--evaluate_during_training",
@@ -100,6 +129,10 @@ def arguments() -> argparse.ArgumentParser:
         default=32,
         type=int,
         help="Batch size per GPU/CPU for evaluation.",
+    )
+
+    parser.add_argument(
+        "--no_cuda", default=False, help="Avoid using CUDA when available"
     )
 
     parser.add_argument(
@@ -147,6 +180,7 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     eval_dataset = TextDataset(
         tokenizer,
         file_path=str(args.eval_file),
+        model_name=args.model_name,
         max_seq_length=cfg.training.max_seq_length,
     )
 
@@ -174,17 +208,18 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
 
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
         inputs, attention_masks, token_type_ids = batch
-        inputs, labels = (
-            mask_tokens(inputs, tokenizer, args)
-        )
+        inputs, labels = mask_tokens(inputs, tokenizer, cfg)
         inputs = inputs.to(device)
         labels = labels.to(device)
         attention_masks = attention_masks.to(device)
         token_type_ids = token_type_ids.to(device)
 
         with torch.no_grad():
-            outputs = (
-                model(inputs, masked_lm_labels=labels, attention_mask=attention_masks, token_type_ids=token_type_ids)
+            outputs = model(
+                inputs,
+                masked_lm_labels=labels,
+                attention_mask=attention_masks,
+                token_type_ids=token_type_ids,
             )
             lm_loss = outputs[0]
             eval_loss += lm_loss.mean().item()
@@ -214,14 +249,17 @@ def mask_tokens(
     # We sample a few tokens in each sequence for masked-LM training (with probability args.mlm_probability defaults to 0.15 in Bert/RoBERTa)
     probability_matrix = torch.full(labels.shape, cfg.training.masked_lm_prob)
     special_tokens_mask = [
-        tokenizer.get_special_tokens_mask(val)
-        for val in labels.tolist()
+        tokenizer.get_special_tokens_mask(val) for val in labels.tolist()
     ]
     probability_matrix.masked_fill_(
         torch.tensor(special_tokens_mask, dtype=torch.bool), value=0.0
     )
     masked_indices = torch.bernoulli(probability_matrix).bool()
-    labels[~masked_indices] = -1  # We only compute loss on masked tokens TODO: change to -100 once the change is merged in tranformers
+    labels[
+        ~masked_indices
+    ] = (
+        -1
+    )  # We only compute loss on masked tokens TODO: change to -100 once the change is merged in tranformers
 
     # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
     indices_replaced = (
@@ -231,7 +269,9 @@ def mask_tokens(
 
     # 10% of the time, we replace masked input tokens with random word
     indices_random = (
-        torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+        torch.bernoulli(torch.full(labels.shape, 0.5)).bool()
+        & masked_indices
+        & ~indices_replaced
     )
     random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long)
     inputs[indices_random] = random_words[indices_random]
@@ -282,7 +322,7 @@ def _rotate_checkpoints(args, checkpoint_prefix, use_mtime=False):
 def _train(args, cfg, dataset, model, tokenizer, device):
     """ Train the model """
     if args.local_rank in [-1, 0]:
-        tb_writer = SummaryWriter()
+        tb_writer = SummaryWriter(args.tensorboard_dir)
 
     train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = (
@@ -325,16 +365,20 @@ def _train(args, cfg, dataset, model, tokenizer, device):
         },
     ]
     optimizer = AdamW(
-        optimizer_grouped_parameters, lr=cfg.training.learning_rate, eps=cfg.training.adam_epsilon
+        optimizer_grouped_parameters,
+        lr=cfg.training.learning_rate,
+        eps=cfg.training.adam_epsilon,
     )
     scheduler = get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=cfg.training.num_warmup_steps, num_training_steps=t_total
+        optimizer,
+        num_warmup_steps=cfg.training.num_warmup_steps,
+        num_training_steps=t_total,
     )
 
     # Check if saved optimizer or scheduler states exist
-    if os.path.isfile(
-        os.path.join(args.out_dir, "optimizer.pt")
-    ) and os.path.isfile(os.path.join(args.out_dir, "scheduler.pt")):
+    if os.path.isfile(os.path.join(args.out_dir, "optimizer.pt")) and os.path.isfile(
+        os.path.join(args.out_dir, "scheduler.pt")
+    ):
         # Load in optimizer and scheduler states
         optimizer.load_state_dict(
             torch.load(os.path.join(args.out_dir, "optimizer.pt"))
@@ -353,6 +397,8 @@ def _train(args, cfg, dataset, model, tokenizer, device):
         model, optimizer = amp.initialize(
             model, optimizer, opt_level=args.fp16_opt_level
         )
+    
+    wandb.watch(model, log='all')
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
@@ -386,7 +432,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
     steps_trained_in_current_epoch = 0
 
     # Check if continuing training from a checkpoint
-    if os.path.exists(args.out_dir + '/' + args.model_name):
+    if os.path.exists(args.out_dir + "/" + args.model_name):
         try:
             # set global_step to gobal_step of last saved checkpoint from model path
             checkpoint_suffix = args.model_name.split("-")[-1].split("/")[0]
@@ -438,17 +484,18 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                 continue
 
             inputs, attention_masks, token_type_ids = batch
-            inputs, labels = (
-                mask_tokens(inputs, tokenizer, cfg)
-            )
+            inputs, labels = mask_tokens(inputs, tokenizer, cfg)
             inputs = inputs.to(device)
             labels = labels.to(device)
             attention_masks = attention_masks.to(device)
             token_type_ids = token_type_ids.to(device)
 
             model.train()
-            outputs = (
-                model(inputs, masked_lm_labels=labels, attention_mask=attention_masks, token_type_ids=token_type_ids)
+            outputs = model(
+                inputs,
+                masked_lm_labels=labels,
+                attention_mask=attention_masks,
+                token_type_ids=token_type_ids,
             )
             loss = outputs[
                 0
@@ -500,6 +547,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                         (tr_loss - logging_loss) / args.logging_steps,
                         global_step,
                     )
+                    wandb.log({"loss": loss})
                     logging_loss = tr_loss
 
                 if (
@@ -533,10 +581,16 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                     )
                     log.info("Saving optimizer and scheduler states to %s", output_dir)
 
-            if cfg.training.num_train_steps > 0 and global_step > cfg.training.num_train_steps:
+            if (
+                cfg.training.num_train_steps > 0
+                and global_step > cfg.training.num_train_steps
+            ):
                 epoch_iterator.close()
                 break
-        if cfg.training.num_train_steps > 0 and global_step > cfg.training.num_train_steps:
+        if (
+            cfg.training.num_train_steps > 0
+            and global_step > cfg.training.num_train_steps
+        ):
             train_iterator.close()
             break
 
@@ -555,7 +609,9 @@ def set_seed(args, cfg):
 
 
 def train(args, cfg):
-    args.model_name = f"calbert-{cfg.model.name}-{'uncased' if cfg.vocab.lowercase else 'cased'}"
+    args.model_name = (
+        f"calbert-{cfg.model.name}-{'uncased' if cfg.vocab.lowercase else 'cased'}"
+    )
     # Setup CUDA, GPU & distributed training
     device = None
     if args.local_rank == -1 or args.no_cuda:
@@ -588,17 +644,26 @@ def train(args, cfg):
         torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
     tokenizer = CalbertTokenizer(
-        str((args.tokenizer_dir / f"ca.bpe.{cfg.vocab.size}-vocab.json").absolute()),
-        str((args.tokenizer_dir / f"ca.bpe.{cfg.vocab.size}-merges.txt").absolute()),
+        str(next(args.tokenizer_dir.glob('*-vocab.json')).absolute()),
+        str(next(args.tokenizer_dir.glob('*-merges.txt')).absolute()),
     )
 
-    config = AlbertConfig(**dict(cfg.model))
+    c = dict(cfg.training)
+    for k in c.keys():
+        wandb.config[k] = c[k]
 
-    model = AlbertForMaskedLM(config)
+    c = dict(cfg.model)
+    for k in c.keys():
+        wandb.config[k] = c[k]
+    
+    config = AlbertConfig(**c)
+
+    model = AlbertForMaskedLM(config).to(device)
 
     train_dataset = TextDataset(
         tokenizer,
         file_path=str(args.train_file),
+        model_name=args.model_name,
         max_seq_length=cfg.training.max_seq_length,
     )
 
@@ -611,7 +676,7 @@ def train(args, cfg):
     log.info(" global_step = %s, average loss = %s", global_step, tr_loss)
 
     # Saving best-practices: if you use save_pretrained for the model and tokenizer, you can reload them using from_pretrained()
-    if (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+    if args.local_rank == -1 or torch.distributed.get_rank() == 0:
         # Create output directory if needed
         if not os.path.exists(args.out_dir) and args.local_rank in [-1, 0]:
             os.makedirs(args.out_dir)
