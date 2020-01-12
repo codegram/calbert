@@ -42,10 +42,9 @@ class TextDataset(Dataset):
         input_text = tqdm(
             open(file_path, encoding="utf-8"), desc="Tokenizing", total=num_lines
         )
-        n = 0
         for line in input_text:
-            n += 1
-            self.examples.append(tokenizer.encode(line.strip(), seq_len=max_seq_length))
+            ids = tokenizer.encode(line.strip(), seq_len=max_seq_length)
+            self.examples.append(ids)
 
     def __len__(self):
         return len(self.examples)
@@ -113,6 +112,22 @@ def arguments() -> argparse.ArgumentParser:
         default="O1",
         help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
         "See details at https://nvidia.github.io/apex/amp.html",
+    )
+
+    parser.add_argument(
+        "--logging_steps", type=int, default=50, help="Log every X updates steps."
+    )
+    parser.add_argument(
+        "--save_steps",
+        type=int,
+        default=50,
+        help="Save checkpoint every X updates steps.",
+    )
+    parser.add_argument(
+        "--save_total_limit",
+        type=int,
+        default=None,
+        help="Limit the total amount of checkpoints, delete the older checkpoints in the output_dir, does not delete by default",
     )
 
     parser.add_argument(
@@ -202,7 +217,7 @@ def mask_tokens(
         torch.tensor(special_tokens_mask, dtype=torch.bool), value=0.0
     )
     masked_indices = torch.bernoulli(probability_matrix).bool()
-    labels[~masked_indices] = -1  # We only compute loss on masked tokens
+    labels[~masked_indices] = -1  # We only compute loss on masked tokens TODO: change to -100 once the change is merged in tranformers
 
     # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
     indices_replaced = (
@@ -423,6 +438,12 @@ def _train(args, cfg, dataset, model, tokenizer, device):
             )
             inputs = inputs.to(device)
             labels = labels.to(device)
+
+            print(inputs.shape)
+            print(labels.shape)
+            log.info(inputs.shape)
+            log.info(labels.shape)
+
             model.train()
             outputs = (
                 model(inputs, masked_lm_labels=labels)
