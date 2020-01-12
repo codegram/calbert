@@ -63,6 +63,7 @@ def create_tokenizer(cfg, data_path, forced_run_id=None):
     r = client.runs.new(
         command="mkdir -p /spell/tokenizer && python calbert.py tokenizer --input-file /spell/train.txt --out-dir /spell/tokenizer",
         commit_label="repo",
+        machine_type="cpu-big",
         pip_packages=packages,
         attached_resources={f"{data_path}/train.txt": "train.txt"},
         idempotent=True,
