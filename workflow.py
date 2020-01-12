@@ -77,6 +77,7 @@ def train_model(cfg, data_path, tokenizer_path):
     r = client.runs.new(
         command=" ".join(
             [
+                "git clone https://www.github.com/nvidia/apex && cd apex && pip install -v --no-cache-dir --global-option='--cpp_ext' --global-option='--cuda_ext' ./ && cd .. && rm -fr apex &&",
                 "python",
                 "calbert.py",
                 "train",
@@ -87,9 +88,10 @@ def train_model(cfg, data_path, tokenizer_path):
                 "--eval-file",
                 "$PWD/valid.txt",
                 "--out-dir",
-                "model",
+                "$PWD/model",
                 "--tensorboard-dir",
-                "tensorboard",
+                "$PWD/tensorboard",
+                "--fp16",
             ]
         ),
         tensorboard_directory="tensorboard",
@@ -117,7 +119,7 @@ def main(cfg):
     data_run, data_path = splitting_dataset(cfg.training, cfg.data, raw_data_path)
     wait(data_run)
 
-    tokenizer_run, tokenizer_path = create_tokenizer(cfg, data_path, forced_run_id=207)
+    tokenizer_run, tokenizer_path = create_tokenizer(cfg, data_path)
     wait(tokenizer_run)
 
     model_run, model_path = train_model(cfg, data_path, tokenizer_path)

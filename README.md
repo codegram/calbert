@@ -1,6 +1,10 @@
 # calbert
 
-A Catalan ALBERT (A Lite BERT), Google's take on self-supervised learning of language representations, trained on the Catalan dataset of [Inria's OSCAR](https://traces1.inria.fr/oscar/) multilingual corpus (729 million unique Catalan words).
+A Catalan ALBERT (A Lite BERT), Google's take on self-supervised learning of language representations.
+
+It's trained on a corpus of 729 million unique Catalan words from the [Inria's OSCAR](https://traces1.inria.fr/oscar/) dataset.
+
+You can read the original [ALBERT paper here](https://arxiv.org/pdf/1909.11942.pdf).
 
 ## Credits
 
@@ -45,7 +49,7 @@ python calbert.py tokenizer --input-file train.txt --out-dir tokenizer/
 You need to provide absolute paths with `$PWD` since these are Hydra runs and they don't run on the current directory.
 
 ```bash
-python calbert.py train --tokenizer-dir $PWD/tokenizer --train-file $PWD/train.txt --eval-file $PWD/valid.txt --out-dir model
+python calbert.py train --tokenizer-dir $PWD/tokenizer --train-file $PWD/train.txt --eval-file $PWD/valid.txt --out-dir $PWD/model --tensorboard-dir $PWD/tensorboard
 ```
 
 Warning, this is really slow! You probably want to run the full thing on GPUs. [Spell](https://spell.run) is our platform of choice.

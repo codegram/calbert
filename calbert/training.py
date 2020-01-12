@@ -112,21 +112,14 @@ def arguments() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--evaluate_during_training",
-        default=True,
-        type=bool,
-        help="Run evaluation during training at each logging step.",
-    )
-
-    parser.add_argument(
         "--per_gpu_train_batch_size",
-        default=32,
+        default=128,
         type=int,
         help="Batch size per GPU/CPU for training.",
     )
     parser.add_argument(
         "--per_gpu_eval_batch_size",
-        default=32,
+        default=128,
         type=int,
         help="Batch size per GPU/CPU for evaluation.",
     )
@@ -149,18 +142,18 @@ def arguments() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--logging_steps", type=int, default=50, help="Log every X updates steps."
+        "--logging_steps", type=int, default=200, help="Log every X updates steps."
     )
     parser.add_argument(
         "--save_steps",
         type=int,
-        default=50,
+        default=200,
         help="Save checkpoint every X updates steps.",
     )
     parser.add_argument(
         "--save_total_limit",
         type=int,
-        default=None,
+        default=50,
         help="Limit the total amount of checkpoints, delete the older checkpoints in the output_dir, does not delete by default",
     )
 
@@ -288,7 +281,7 @@ def _rotate_checkpoints(args, checkpoint_prefix, use_mtime=False):
 
     # Check if we should delete older checkpoint(s)
     glob_checkpoints = glob.glob(
-        os.path.join(args.output_dir, "{}-*".format(checkpoint_prefix))
+        os.path.join(args.out_dir, "{}-*".format(checkpoint_prefix))
     )
     if len(glob_checkpoints) <= args.save_total_limit:
         return
@@ -398,7 +391,8 @@ def _train(args, cfg, dataset, model, tokenizer, device):
             model, optimizer, opt_level=args.fp16_opt_level
         )
     
-    wandb.watch(model, log='all')
+    wandb.config.train_batch_size = train_batch_size
+    #wandb.watch(model, log='all')
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
@@ -541,13 +535,14 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                             tb_writer.add_scalar(
                                 "eval_{}".format(key), value, global_step
                             )
+                            wandb.log({f"val_{key}": value})
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar(
                         "loss",
                         (tr_loss - logging_loss) / args.logging_steps,
                         global_step,
                     )
-                    wandb.log({"loss": loss})
+                    wandb.log({"tr_loss": (tr_loss - logging_loss) / args.logging_steps})
                     logging_loss = tr_loss
 
                 if (
