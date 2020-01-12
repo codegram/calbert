@@ -1,11 +1,8 @@
 data:
   dedup: True
   subset: False
-  subset_size: 22000 # 22000
-  chunk_size_lines: 10000
-  chunk_name_size: 55
-  valid_split: 0.1
-  # 13200000 / chunk_size_lines / 26 =~ chunk_name_size
+  subset_size: 22000
+  valid_split: 0.04
 
 vocab:
   size: 30000
