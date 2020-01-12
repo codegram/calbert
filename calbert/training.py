@@ -36,44 +36,16 @@ wandb.init(project='calbert', sync_tensorboard=True)
 
 
 class TextDataset(Dataset):
-    def __init__(self, tokenizer, file_path, model_name, max_seq_length):
-        assert os.path.isfile(file_path)
-        directory, filename = os.path.split(file_path)
-        cached_features_file = os.path.join(
-            directory,
-            model_name + "_cached_lm_" + str(max_seq_length) + "_" + filename + '.pkl',
-        )
-       
-        if os.path.exists(cached_features_file):
-            log.info("Loading features from cached file %s", cached_features_file)
-            with open(cached_features_file, "rb") as handle:
-                self.examples = pickle.load(handle)
-        else:
-            log.info("Tokenizing dataset file at %s", file_path)
-
-            self.examples = []
-            num_lines = sum(1 for line in open(file_path, "r"))
-            input_text = tqdm(
-                open(file_path, encoding="utf-8"), desc="Tokenizing", total=num_lines
-            )
-            for line in input_text:
-                encoded = tokenizer.process(line.strip(), max_seq_len=max_seq_length)
-                self.examples.append((encoded.ids, encoded.attention_mask, encoded.type_ids))
-
-            log.info("Saving features into cached file %s", cached_features_file)
-            with open(cached_features_file, "wb") as handle:
-                pickle.dump(self.examples, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    def __init__(self, file_path):
+        log.info("Loading dataset from %s", file_path)
+        with open(str(file_path.absolute()), "rb") as handle:
+            self.examples = pickle.load(handle)
 
     def __len__(self):
         return len(self.examples)
 
     def __getitem__(self, item):
-        (ids, att_mask, type_ids) = self.examples[item]
-        return (
-            torch.tensor(ids),
-            torch.tensor(att_mask),
-            torch.tensor(type_ids),
-        )
+        return self.examples[item]
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -85,16 +57,16 @@ def arguments() -> argparse.ArgumentParser:
         help="The folder where ca.bpe.VOCABSIZE-vocab.json and ca.bpe.VOCABSIZE-merges.txt are",
     )
     parser.add_argument(
-        "--train-file",
+        "--train-dataset",
         required=True,
         type=Path,
-        help="A raw text file with one sentence per line, for training",
+        help="A processed pickled dataset, for training",
     )
     parser.add_argument(
-        "--eval-file",
+        "--eval-dataset",
         required=True,
         type=Path,
-        help="A raw text file with one sentence per line, for evaluation",
+        help="A processed pickled dataset, for evaluation",
     )
     parser.add_argument(
         "--out-dir",
@@ -171,10 +143,7 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     eval_output_dir = args.out_dir
 
     eval_dataset = TextDataset(
-        tokenizer,
-        file_path=str(args.eval_file),
-        model_name=args.model_name,
-        max_seq_length=cfg.training.max_seq_length,
+        file_path=str(args.eval_dataset),
     )
 
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
@@ -656,10 +625,7 @@ def train(args, cfg):
     model = AlbertForMaskedLM(config).to(device)
 
     train_dataset = TextDataset(
-        tokenizer,
-        file_path=str(args.train_file),
-        model_name=args.model_name,
-        max_seq_length=cfg.training.max_seq_length,
+        file_path=str(args.train_dataset),
     )
 
     log.info("Loaded %i examples", len(train_dataset))

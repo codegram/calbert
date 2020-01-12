@@ -61,7 +61,7 @@ def create_tokenizer(cfg, data_path, forced_run_id=None):
         return (None, f"runs/{forced_run_id}/tokenizer")
 
     r = client.runs.new(
-        command="mkdir -p /spell/tokenizer && python calbert.py tokenizer --input-file /spell/train.txt --out-dir /spell/tokenizer",
+        command="mkdir -p /spell/tokenizer && python calbert.py train_tokenizer --input-file /spell/train.txt --out-dir /spell/tokenizer",
         commit_label="repo",
         machine_type="cpu-big",
         pip_packages=packages,
@@ -74,20 +74,43 @@ def create_tokenizer(cfg, data_path, forced_run_id=None):
     return (r, f"runs/{r.id}/tokenizer")
 
 
-def train_model(cfg, data_path, tokenizer_path):
+def create_dataset(cfg, data_path, tokenizer_path, forced_run_id=None):
+    if forced_run_id:
+        log.info(f"[{forced_run_id}] Creating dataset... (forcedly cached)")
+        return (None, f"runs/{forced_run_id}/dataset")
+
+    r = client.runs.new(
+        command="mkdir -p $PWD/dataset && python calbert.py dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset",
+        commit_label="repo",
+        machine_type="ram-big",
+        pip_packages=packages,
+        attached_resources={
+            f"{data_path}/train.txt": "train.txt",
+            f"{data_path}/valid.txt": "valid.txt",
+            tokenizer_path: "tokenizer",
+        },
+        idempotent=True,
+    )
+    log.info(
+        f"[{r.id}] Creating dataset... ({'cached' if r.already_existed else 'running'})"
+    )
+    return (r, f"runs/{r.id}/dataset")
+
+
+def train_model(cfg, tokenizer_path, dataset_path):
     r = client.runs.new(
         command=" ".join(
             [
                 "git clone https://www.github.com/nvidia/apex && cd apex && pip install -v --no-cache-dir --global-option='--cpp_ext' --global-option='--cuda_ext' ./ && cd .. && rm -fr apex &&",
                 "python",
                 "calbert.py",
-                "train",
+                "train_model",
                 "--tokenizer-dir",
                 "$PWD/tokenizer",
-                "--train-file",
-                "$PWD/train.txt",
-                "--eval-file",
-                "$PWD/valid.txt",
+                "--train-dataset",
+                "$PWD/dataset/train.pkl",
+                "--eval-dataset",
+                "$PWD/dataset/valid.pkl",
                 "--out-dir",
                 "$PWD/model",
                 "--tensorboard-dir",
@@ -99,11 +122,7 @@ def train_model(cfg, data_path, tokenizer_path):
         commit_label="repo",
         machine_type="v100",
         pip_packages=packages,
-        attached_resources={
-            f"{data_path}/train.txt": "train.txt",
-            f"{data_path}/valid.txt": "valid.txt",
-            tokenizer_path: "tokenizer",
-        },
+        attached_resources={tokenizer_path: "tokenizer", dataset_path: "dataset",},
         idempotent=True,
     )
     log.info(
@@ -120,10 +139,13 @@ def main(cfg):
     data_run, data_path = splitting_dataset(cfg.training, cfg.data, raw_data_path)
     wait(data_run)
 
-    tokenizer_run, tokenizer_path = create_tokenizer(cfg, data_path)
+    tokenizer_run, tokenizer_path = create_tokenizer(cfg, data_path, forced_run_id=246)
     wait(tokenizer_run)
 
-    model_run, model_path = train_model(cfg, data_path, tokenizer_path)
+    dataset_run, dataset_path = create_dataset(cfg, data_path, tokenizer_path)
+    wait(dataset_run)
+
+    model_run, model_path = train_model(cfg, tokenizer_path, dataset_path)
     wait(model_run, logs=True)
 
 

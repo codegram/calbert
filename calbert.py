@@ -4,16 +4,24 @@ import sys
 import argparse
 from pathlib import Path
 
-from calbert import tokenizer, training
+from calbert import tokenizer, training, dataset
 
 log = logging.getLogger(__name__)
 
 TASK_WITH_ARGS = (None, None)
 
-VALID_COMMANDS = ["tokenizer", "train"]
+VALID_COMMANDS = ["train_tokenizer", "train_model", "dataset"]
 
-TASKS = {"tokenizer": tokenizer.train, "train": training.train}
-PARSERS = {"tokenizer": tokenizer.arguments, "train": training.arguments}
+TASKS = {
+    "train_tokenizer": tokenizer.train,
+    "train_model": training.train,
+    "dataset": dataset.process,
+}
+PARSERS = {
+    "train_tokenizer": tokenizer.arguments,
+    "train_model": training.arguments,
+    "dataset": dataset.arguments,
+}
 
 
 def parse(command):

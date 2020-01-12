@@ -19,6 +19,13 @@ class CalbertTokenizer(BaseTokenizer):
     Represents the BPE algorithm, with the pretokenization used by SentencePiece
     """
 
+    @classmethod
+    def from_dir(cls, tokenizer_dir: Path):
+        return CalbertTokenizer(
+            str(next(tokenizer_dir.glob("*-vocab.json")).absolute()),
+            str(next(tokenizer_dir.glob("*-merges.txt")).absolute()),
+        )
+
     def __init__(
         self,
         vocab_file: Optional[str] = None,
