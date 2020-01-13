@@ -13,7 +13,8 @@ from .tokenizer import CalbertTokenizer
 
 log = logging.getLogger(__name__)
 
-LMDB_MAP_SIZE = 1.05e11  # 105 GB
+TRAIN_LMDB_MAP_SIZE = 5.5e10  # 55 GB
+VALID_LMDB_MAP_SIZE = 4e9  # 4 GB
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -27,12 +28,9 @@ def arguments() -> argparse.ArgumentParser:
     return parser
 
 
-def _process_file(tokenizer, file_path, out_filename, max_seq_length):
+def _process_file(tokenizer, file_path, out_filename, max_seq_length, size):
     env = lmdb.open(
-        str(out_filename.absolute()),
-        map_size=LMDB_MAP_SIZE,
-        writemap=True,
-        map_async=True,
+        str(out_filename.absolute()), map_size=size, writemap=True, map_async=True,
     )
 
     examples = []
@@ -62,14 +60,16 @@ def process(args, cfg):
     _process_file(
         tokenizer,
         args.train_file,
-        args.out_dir / "train.lmdb",
+        args.out_dir / f"train_{cfg.training.max_seq_length}.lmdb",
         cfg.training.max_seq_length,
+        TRAIN_LMDB_MAP_SIZE,
     )
     _process_file(
         tokenizer,
         args.valid_file,
-        args.out_dir / "valid.lmdb",
+        args.out_dir / f"valid_{cfg.training.max_seq_length}.lmdb",
         cfg.training.max_seq_length,
+        VALID_LMDB_MAP_SIZE,
     )
 
     log.info(f"Wrote dataset at {str(args.out_dir)}/train|valid.lmdb")

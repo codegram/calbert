@@ -131,7 +131,7 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     eval_output_dir = args.out_dir
 
     eval_dataset = CalbertDataset(
-        file_path=str(args.eval_dataset),
+        file_path=args.eval_dataset,
     )
 
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
@@ -613,7 +613,7 @@ def train(args, cfg):
     model = AlbertForMaskedLM(config).to(device)
 
     train_dataset = CalbertDataset(
-        file_path=str(args.train_dataset),
+        file_path=args.train_dataset,
     )
 
     log.info("Loaded %i examples", len(train_dataset))
