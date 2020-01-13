@@ -82,7 +82,7 @@ def create_dataset(cfg, data_path, tokenizer_path, forced_run_id=None):
     r = client.runs.new(
         command="mkdir -p $PWD/dataset && python calbert.py dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset",
         commit_label="repo",
-        machine_type="ram-big",
+        machine_type="cpu-big",
         pip_packages=packages,
         attached_resources={
             f"{data_path}/train.txt": "train.txt",
@@ -108,9 +108,9 @@ def train_model(cfg, tokenizer_path, dataset_path):
                 "--tokenizer-dir",
                 "$PWD/tokenizer",
                 "--train-dataset",
-                "$PWD/dataset/train.pkl",
+                "$PWD/dataset/train.lmdb",
                 "--eval-dataset",
-                "$PWD/dataset/valid.pkl",
+                "$PWD/dataset/valid.lmdb",
                 "--out-dir",
                 "$PWD/model",
                 "--tensorboard-dir",
@@ -122,7 +122,7 @@ def train_model(cfg, tokenizer_path, dataset_path):
         commit_label="repo",
         machine_type="v100",
         pip_packages=packages,
-        attached_resources={tokenizer_path: "tokenizer", dataset_path: "dataset",},
+        attached_resources={tokenizer_path: "tokenizer", dataset_path: "dataset"},
         idempotent=True,
     )
     log.info(

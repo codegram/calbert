@@ -24,6 +24,7 @@ from transformers import (
 )
 
 from .tokenizer import CalbertTokenizer
+from .dataset import CalbertDataset
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -33,19 +34,6 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 wandb.init(project='calbert', sync_tensorboard=True)
-
-
-class TextDataset(Dataset):
-    def __init__(self, file_path):
-        log.info("Loading dataset from %s", file_path)
-        with open(str(file_path.absolute()), "rb") as handle:
-            self.examples = pickle.load(handle)
-
-    def __len__(self):
-        return len(self.examples)
-
-    def __getitem__(self, item):
-        return self.examples[item]
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -142,7 +130,7 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_output_dir = args.out_dir
 
-    eval_dataset = TextDataset(
+    eval_dataset = CalbertDataset(
         file_path=str(args.eval_dataset),
     )
 
@@ -624,7 +612,7 @@ def train(args, cfg):
 
     model = AlbertForMaskedLM(config).to(device)
 
-    train_dataset = TextDataset(
+    train_dataset = CalbertDataset(
         file_path=str(args.train_dataset),
     )
 

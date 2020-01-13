@@ -17,6 +17,7 @@ torch = "==1.3.1"
 transformers = "==2.3.0"
 tensorboardX = "==2.0"
 tokenizers = "==0.1.1"
+lmdb = "==0.98"
 
 [requires]
 python_version = "3.7.5"
