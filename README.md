@@ -1,4 +1,4 @@
-# calbert
+# calbert ![](https://github.com/codegram/calbert/workflows/Tests/badge.svg)
 
 `Warning! This is pre-alpha code! Run at your own risk :)`
 
