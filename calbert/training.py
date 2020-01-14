@@ -34,7 +34,7 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-wandb.init(project='calbert', sync_tensorboard=True)
+wandb.init(project="calbert", sync_tensorboard=True)
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -131,9 +131,7 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_output_dir = args.out_dir
 
-    eval_dataset = CalbertDataset(
-        file_path=args.eval_dataset,
-    )
+    eval_dataset = CalbertDataset(file_path=args.eval_dataset,)
 
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(eval_output_dir)
@@ -158,8 +156,8 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     model.eval()
 
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
-        inputs, attention_masks, token_type_ids = batch
-        inputs, labels = mask_tokens(inputs, tokenizer, cfg)
+        inputs, special_tokens_masks, attention_masks, token_type_ids = batch
+        inputs, labels = mask_tokens(inputs, special_tokens_masks, tokenizer, cfg)
         inputs = inputs.to(device)
         labels = labels.to(device)
         attention_masks = attention_masks.to(device)
@@ -192,18 +190,18 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
 
 
 def mask_tokens(
-    inputs: torch.Tensor, tokenizer: CalbertTokenizer, cfg
+    inputs: torch.Tensor,
+    special_tokens_mask: torch.Tensor,
+    tokenizer: CalbertTokenizer,
+    cfg,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """ Prepare masked tokens inputs/labels for masked language modeling: 80% MASK, 10% random, 10% original. """
 
     labels = inputs.clone()
     # We sample a few tokens in each sequence for masked-LM training (with probability args.mlm_probability defaults to 0.15 in Bert/RoBERTa)
     probability_matrix = torch.full(labels.shape, cfg.training.masked_lm_prob)
-    special_tokens_mask = [
-        tokenizer.get_special_tokens_mask(val) for val in labels.tolist()
-    ]
     probability_matrix.masked_fill_(
-        torch.tensor(special_tokens_mask, dtype=torch.bool), value=0.0
+        special_tokens_mask.bool(), value=0.0
     )
     masked_indices = torch.bernoulli(probability_matrix).bool()
     labels[
@@ -435,8 +433,8 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                 steps_trained_in_current_epoch -= 1
                 continue
 
-            inputs, attention_masks, token_type_ids = batch
-            inputs, labels = mask_tokens(inputs, tokenizer, cfg)
+            inputs, special_tokens_masks, attention_masks, token_type_ids = batch
+            inputs, labels = mask_tokens(inputs, special_tokens_masks, tokenizer, cfg)
             inputs = inputs.to(device)
             labels = labels.to(device)
             attention_masks = attention_masks.to(device)
@@ -500,7 +498,9 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                         (tr_loss - logging_loss) / args.logging_steps,
                         global_step,
                     )
-                    wandb.log({"tr_loss": (tr_loss - logging_loss) / args.logging_steps})
+                    wandb.log(
+                        {"tr_loss": (tr_loss - logging_loss) / args.logging_steps}
+                    )
                     logging_loss = tr_loss
 
                 if (
@@ -597,8 +597,8 @@ def train(args, cfg):
         torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
     tokenizer = CalbertTokenizer(
-        path_to_str(next(args.tokenizer_dir.glob('*-vocab.json'))),
-        path_to_str(next(args.tokenizer_dir.glob('*-merges.txt'))),
+        path_to_str(next(args.tokenizer_dir.glob("*-vocab.json"))),
+        path_to_str(next(args.tokenizer_dir.glob("*-merges.txt"))),
     )
 
     c = dict(cfg.training)
@@ -613,9 +613,7 @@ def train(args, cfg):
 
     model = AlbertForMaskedLM(config).to(device)
 
-    train_dataset = CalbertDataset(
-        file_path=args.train_dataset,
-    )
+    train_dataset = CalbertDataset(file_path=args.train_dataset,)
 
     log.info("Loaded %i examples", len(train_dataset))
 

@@ -46,15 +46,9 @@ def _process_file(
     input_text = tqdm(open(path, encoding="utf-8"), desc="Tokenizing", total=num_lines)
     with env.begin(write=True) as txn:
         for idx, line in enumerate(input_text):
-            encoded = tokenizer.process(line.strip(), max_seq_len=max_seq_length)
-            example = torch.stack(
-                [
-                    torch.tensor(encoded.ids),
-                    torch.tensor(encoded.attention_mask),
-                    torch.tensor(encoded.type_ids),
-                ]
-            )
-            txn.put("{}".format(idx).encode("ascii"), pickle.dumps(example))
+            e = tokenizer.process(line.strip(), max_seq_len=max_seq_length)
+            tensor = tokenizer.encoding_to_tensor(e)
+            txn.put("{}".format(idx).encode("ascii"), pickle.dumps(tensor))
 
     log.info("Saving features into cached file %s", str(out_filename))
 
@@ -99,10 +93,10 @@ class CalbertDataset(Dataset):
 
     def __getitem__(self, index):
         with self.env.begin(write=False, buffers=True) as txn:
-            tokens, ids = pickle.load(
+            stack = pickle.load(
                 io.StringIO(txn.get("{}".format(index).encode("ascii")))
             )
-        return tokens, ids
+        return stack
 
     def __len__(self):
         return self.length

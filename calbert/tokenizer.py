@@ -3,7 +3,8 @@ import argparse
 from pathlib import Path
 from typing import Collection
 
-from tokenizers import pre_tokenizers, decoders, trainers, Tokenizer
+import torch
+from tokenizers import pre_tokenizers, decoders, trainers, Tokenizer, Encoding
 from tokenizers.processors import BertProcessing
 from tokenizers.models import BPE
 from tokenizers.normalizers import NFKC
@@ -93,36 +94,8 @@ class CalbertTokenizer(BaseTokenizer):
         return self._tokenizer.get_vocab_size()
 
     @property
-    def sep_token_id(self):
-        return self.token_to_id("[SEP]")
-
-    @property
-    def cls_token_id(self):
-        return self.token_to_id("[CLS]")
-
-    @property
-    def mask_token_id(self):
-        return self.token_to_id("[MASK]")
-
-    @property
-    def unk_token_id(self):
-        return self.token_to_id("<unk>")
-
-    @property
     def pad_token_id(self):
         return self.token_to_id("<pad>")
-
-    def is_special_token(self, token_id: int) -> bool:
-        return token_id in [
-            self.sep_token_id,
-            self.cls_token_id,
-            self.mask_token_id,
-            self.unk_token_id,
-            self.pad_token_id,
-        ]
-
-    def get_special_tokens_mask(self, ids):
-        return [1 if self.is_special_token(t) else 0 for t in ids]
 
     def process(self, sequence: str, pair: Optional[str] = None, max_seq_len: int = 0):
         enc = self.encode(sequence, pair)
@@ -130,6 +103,17 @@ class CalbertTokenizer(BaseTokenizer):
             enc.pad(max_seq_len, pad_token="<pad>", pad_id=self.pad_token_id)
             enc.truncate(max_seq_len)
         return enc
+
+
+def encoding_to_tensor(e: Encoding) -> torch.Tensor:
+    return torch.stack(
+        [
+            torch.tensor(e.ids),
+            torch.tensor(e.special_tokens_mask),
+            torch.tensor(e.attention_mask),
+            torch.tensor(e.type_ids),
+        ]
+    )
 
 
 def arguments() -> argparse.ArgumentParser:
