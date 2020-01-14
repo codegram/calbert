@@ -1,5 +1,7 @@
 # calbert
 
+`Warning! This is pre-alpha code! Run at your own risk :)`
+
 A Catalan ALBERT (A Lite BERT), Google's take on self-supervised learning of language representations.
 
 It's trained on a corpus of 729 million unique Catalan words from the [Inria's OSCAR](https://traces1.inria.fr/oscar/) dataset.
@@ -40,8 +42,20 @@ All configuration is overridable, since it's [Hydra](https://cli.dev) configurat
 
 ### Training the tokenizer
 
+We're training the tokenizer only on the training set, not the validation set.
+
 ```bash
-python calbert.py tokenizer --input-file train.txt --out-dir tokenizer/
+mkdir -p tokenizer
+python calbert.py train_tokenizer --input-file $PWD/train.txt --out-dir $PWD/tokenizer
+```
+
+### Producing the dataset
+
+The dataset is basically a distillation of the raw text data into fixed-length sentences represented by a triple of tensors `(token_ids, attention_mask, tensor_type_ids)`. Producing these triples is computationally expensive so we have a separate step for it.
+
+```bash
+mkdir -p dataset
+python calbert.py dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset
 ```
 
 ### Training the model
@@ -49,7 +63,7 @@ python calbert.py tokenizer --input-file train.txt --out-dir tokenizer/
 You need to provide absolute paths with `$PWD` since these are Hydra runs and they don't run on the current directory.
 
 ```bash
-python calbert.py train --tokenizer-dir $PWD/tokenizer --train-file $PWD/train.txt --eval-file $PWD/valid.txt --out-dir $PWD/model --tensorboard-dir $PWD/tensorboard
+python calbert.py train_model --tokenizer-dir $PWD/tokenizer --train-file $PWD/dataset/train.lmdb --eval-file $PWD/dataset/valid.lmdb --out-dir $PWD/model --tensorboard-dir $PWD/tensorboard
 ```
 
 Warning, this is really slow! You probably want to run the full thing on GPUs. [Spell](https://spell.run) is our platform of choice.
