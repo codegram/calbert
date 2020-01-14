@@ -9,6 +9,7 @@ wandb = "*"
 pytest = "*"
 pytest-concurrent = "*"
 pytest-testdox = "*"
+flake8 = "*"
 
 [packages]
 hydra-core = "*"

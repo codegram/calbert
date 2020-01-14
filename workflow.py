@@ -120,7 +120,7 @@ def train_model(cfg, tokenizer_path, dataset_path):
         ),
         tensorboard_directory="tensorboard",
         commit_label="repo",
-        machine_type="v100",
+        machine_type="p100",
         pip_packages=packages,
         attached_resources={tokenizer_path: "tokenizer", dataset_path: "dataset"},
         idempotent=True,

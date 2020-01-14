@@ -347,7 +347,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
         model, optimizer = amp.initialize(
             model, optimizer, opt_level=args.fp16_opt_level
         )
-    
+
     wandb.config.train_batch_size = train_batch_size
     # wandb.watch(model, log='all')
 
@@ -607,7 +607,7 @@ def train(args, cfg):
     c = dict(cfg.model)
     for k in c.keys():
         wandb.config[k] = c[k]
-    
+
     config = AlbertConfig(**c)
 
     model = AlbertForMaskedLM(config).to(device)
