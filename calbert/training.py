@@ -25,6 +25,7 @@ from transformers import (
 
 from .tokenizer import CalbertTokenizer
 from .dataset import CalbertDataset
+from .utils import path_to_str
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -596,8 +597,8 @@ def train(args, cfg):
         torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
     tokenizer = CalbertTokenizer(
-        str(next(args.tokenizer_dir.glob('*-vocab.json')).absolute()),
-        str(next(args.tokenizer_dir.glob('*-merges.txt')).absolute()),
+        path_to_str(next(args.tokenizer_dir.glob('*-vocab.json'))),
+        path_to_str(next(args.tokenizer_dir.glob('*-merges.txt'))),
     )
 
     c = dict(cfg.training)

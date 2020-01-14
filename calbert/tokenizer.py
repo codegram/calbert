@@ -11,6 +11,8 @@ from tokenizers.implementations.base_tokenizer import BaseTokenizer
 
 from typing import Optional, List, Union
 
+from .utils import path_to_str
+
 log = logging.getLogger(__name__)
 
 
@@ -22,8 +24,8 @@ class CalbertTokenizer(BaseTokenizer):
     @classmethod
     def from_dir(cls, tokenizer_dir: Path):
         return CalbertTokenizer(
-            str(next(tokenizer_dir.glob("*-vocab.json")).absolute()),
-            str(next(tokenizer_dir.glob("*-merges.txt")).absolute()),
+            path_to_str(next(tokenizer_dir.glob("*-vocab.json"))),
+            path_to_str(next(tokenizer_dir.glob("*-merges.txt"))),
         )
 
     def __init__(
@@ -122,8 +124,8 @@ class CalbertTokenizer(BaseTokenizer):
     def get_special_tokens_mask(self, ids):
         return [1 if self.is_special_token(t) else 0 for t in ids]
 
-    def process(self, sequence, max_seq_len: int = 0):
-        enc = self.encode(sequence)
+    def process(self, sequence: str, pair: Optional[str] = None, max_seq_len: int = 0):
+        enc = self.encode(sequence, pair)
         if max_seq_len > 0:
             enc.pad(max_seq_len, pad_token="<pad>", pad_id=self.pad_token_id)
             enc.truncate(max_seq_len)
@@ -137,23 +139,23 @@ def arguments() -> argparse.ArgumentParser:
     return parser
 
 
-def train(args, cfg) -> (Tokenizer, int):
+def train(args, cfg) -> Tokenizer:
     log.info(f"Training tokenizer: {args}")
 
     tokenizer = CalbertTokenizer()
 
     tokenizer.train(
-        [str(args.input_file.absolute())],
+        [path_to_str(args.input_file)],
         vocab_size=cfg.vocab.size,
         min_frequency=cfg.vocab.min_frequency,
         special_tokens=["<unk>", "<pad>", "[MASK]", "[SEP]", "[CLS]"],
     )
 
-    vocab_size = tokenizer._tokenizer.get_vocab_size()
-    tokenizer.save(str(args.out_dir.absolute()), f"ca.bpe.{vocab_size}")
+    out_dir = path_to_str(args.out_dir)
+    tokenizer.save(out_dir, f"ca.bpe.{len(tokenizer)}")
 
     log.info(
-        f"Saved tokenizer as {args.out_dir.absolute()}/ca.bpe.{vocab_size}[-vocab.json|-merges.txt]"
+        f"Saved tokenizer as {out_dir}/ca.bpe.{len(tokenizer)}[-vocab.json|-merges.txt]"
     )
 
-    return tokenizer, vocab_size
+    return tokenizer

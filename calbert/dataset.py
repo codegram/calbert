@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm, trange
 
 from .tokenizer import CalbertTokenizer
+from .utils import path_to_str
 
 log = logging.getLogger(__name__)
 
@@ -28,13 +29,19 @@ def arguments() -> argparse.ArgumentParser:
     return parser
 
 
-def _process_file(tokenizer, file_path, out_filename, max_seq_length, size):
+def _process_file(
+    tokenizer: CalbertTokenizer,
+    file_path: Path,
+    out_filename: Path,
+    max_seq_length: int,
+    size: int,
+):
     env = lmdb.open(
-        str(out_filename.absolute()), map_size=size, writemap=True, map_async=True,
+        path_to_str(out_filename), map_size=size, writemap=True, map_async=True,
     )
 
     examples = []
-    path = str(file_path.absolute())
+    path = path_to_str(file_path)
     num_lines = sum(1 for line in open(path, "r"))
     input_text = tqdm(open(path, encoding="utf-8"), desc="Tokenizing", total=num_lines)
     with env.begin(write=True) as txn:
@@ -80,7 +87,7 @@ class CalbertDataset(Dataset):
         super(CalbertDataset, self).__init__()
 
         self.env = lmdb.open(
-            str(file_path.absolute()),
+            path_to_str(file_path),
             max_readers=1,
             readonly=True,
             lock=False,
