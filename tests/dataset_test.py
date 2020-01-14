@@ -6,14 +6,64 @@ import argparse
 from pathlib import Path
 
 from omegaconf import OmegaConf
-from calbert import tokenizer
+
+from calbert import dataset
 
 from .tokenizer_test import train_tokenizer
+from .conftest import InputData, folder
+
+
+@pytest.fixture(scope="module")
+def dataset_args_cfg():
+    with InputData("train") as train_file:
+        with InputData("valid") as valid_file:
+            with folder() as tokenizer_dir:
+                with folder() as dataset_dir:
+                    tokenizer, _ = train_tokenizer((train_file, tokenizer_dir))
+                    args = dataset.arguments().parse_args(
+                        [
+                            "--tokenizer-dir",
+                            tokenizer_dir,
+                            "--out-dir",
+                            dataset_dir,
+                            "--train-file",
+                            train_file,
+                            "--valid-file",
+                            valid_file,
+                        ]
+                    )
+                    config = [
+                        "training.max_seq_length=12",
+                    ]
+                    cfg = OmegaConf.from_dotlist(config)
+                    yield args, cfg, tokenizer
 
 
 @pytest.mark.describe("dataset.Dataset")
 class TestDataset:
-    @pytest.mark.it("Turns raw text into a ready to consume dataset")
-    def test_train(self, input_file_and_outdir):
-        t, tokenizer_dir = train_tokenizer(input_file_and_outdir)
+    @pytest.mark.it("Turns raw text into a dataset consumable with random access")
+    def test_process(self, dataset_args_cfg):
+        args, cfg, tokenizer = dataset_args_cfg
+        outdir = args.out_dir
+        dataset.process(args, cfg, train_size=300000, valid_size=100000)
+        train_ds = dataset.CalbertDataset(outdir / "train_12.lmdb")
+        valid_ds = dataset.CalbertDataset(outdir / "valid_12.lmdb")
+        assert len(train_ds) == 4
+        assert len(valid_ds) == 1
 
+        tensor = train_ds[3]
+        assert tensor.shape == (4, 12)
+        assert [tokenizer.id_to_token(x) for x in tensor[0].tolist()] == [
+            "[CLS]",
+            "▁",
+            "H",
+            "o",
+            "l",
+            "a",
+            "[SEP]",
+            "<pad>",
+            "<pad>",
+            "<pad>",
+            "<pad>",
+            "<pad>",
+        ]

@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm, trange
 
-from .tokenizer import CalbertTokenizer
+from .tokenizer import CalbertTokenizer, encoding_to_tensor
 from .utils import path_to_str
 
 log = logging.getLogger(__name__)
@@ -47,13 +47,13 @@ def _process_file(
     with env.begin(write=True) as txn:
         for idx, line in enumerate(input_text):
             e = tokenizer.process(line.strip(), max_seq_len=max_seq_length)
-            tensor = tokenizer.encoding_to_tensor(e)
+            tensor = encoding_to_tensor(e)
             txn.put("{}".format(idx).encode("ascii"), pickle.dumps(tensor))
 
     log.info("Saving features into cached file %s", str(out_filename))
 
 
-def process(args, cfg):
+def process(args, cfg, train_size=TRAIN_LMDB_MAP_SIZE, valid_size=VALID_LMDB_MAP_SIZE):
     log.info(f"Creating dataset: {args}")
 
     tokenizer = CalbertTokenizer.from_dir(args.tokenizer_dir)
@@ -63,14 +63,14 @@ def process(args, cfg):
         args.train_file,
         args.out_dir / f"train_{cfg.training.max_seq_length}.lmdb",
         cfg.training.max_seq_length,
-        TRAIN_LMDB_MAP_SIZE,
+        train_size,
     )
     _process_file(
         tokenizer,
         args.valid_file,
         args.out_dir / f"valid_{cfg.training.max_seq_length}.lmdb",
         cfg.training.max_seq_length,
-        VALID_LMDB_MAP_SIZE,
+        valid_size,
     )
 
     log.info(f"Wrote dataset at {str(args.out_dir)}/train|valid.lmdb")
@@ -93,9 +93,8 @@ class CalbertDataset(Dataset):
 
     def __getitem__(self, index):
         with self.env.begin(write=False, buffers=True) as txn:
-            stack = pickle.load(
-                io.StringIO(txn.get("{}".format(index).encode("ascii")))
-            )
+            bf = txn.get(str(index).encode("ascii"))
+            stack = pickle.loads(bf)
         return stack
 
     def __len__(self):
