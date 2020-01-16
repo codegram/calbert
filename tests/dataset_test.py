@@ -7,7 +7,7 @@ from pathlib import Path
 
 from omegaconf import OmegaConf
 
-from calbert import dataset
+from calbert import dataset, utils
 
 from .tokenizer_test import train_tokenizer
 from .conftest import InputData, folder
@@ -34,6 +34,7 @@ def dataset_args_cfg():
                     )
                     config = [
                         "training.max_seq_length=12",
+                        "vocab.max_size=10",
                     ]
                     cfg = OmegaConf.from_dotlist(config)
                     yield args, cfg, tokenizer
@@ -45,9 +46,19 @@ class TestDataset:
     def test_process(self, dataset_args_cfg):
         args, cfg, tokenizer = dataset_args_cfg
         outdir = args.out_dir
-        dataset.process(args, cfg, train_size=300000, valid_size=100000)
-        train_ds = dataset.CalbertDataset(outdir / "train_12.lmdb")
-        valid_ds = dataset.CalbertDataset(outdir / "valid_12.lmdb")
+        dataset.process(args, cfg)
+        train_ds = dataset.CalbertDataset(
+            outdir,
+            split="train",
+            max_seq_length=cfg.training.max_seq_length,
+            max_vocab_size=cfg.vocab.max_size,
+        )
+        valid_ds = dataset.CalbertDataset(
+            outdir,
+            split="valid",
+            max_seq_length=cfg.training.max_seq_length,
+            max_vocab_size=cfg.vocab.max_size,
+        )
         assert len(train_ds) == 4
         assert len(valid_ds) == 1
 

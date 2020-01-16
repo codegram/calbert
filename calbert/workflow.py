@@ -1,17 +1,15 @@
 import spell.client
-import hydra
+import argparse
 import logging
 
 log = logging.getLogger(__name__)
 
 packages = [
-    dep.strip() for dep in open("./requirements.txt").readlines() if "==" in dep
+    dep.strip() for dep in open("../requirements.txt").readlines() if "==" in dep
 ]
 
-client = spell.client.from_environment()
 
-
-def wait(run, logs=False):
+def wait(client, run, logs=False):
     if run is None:
         return
     if logs:
@@ -22,7 +20,7 @@ def wait(run, logs=False):
     run.refresh()
 
 
-def download_data(cfg):
+def download_data(client, cfg):
     filename = "ca_dedup.txt.gz" if cfg.dedup else "ca.txt.gz"
     data_url = f"https://traces1.inria.fr/oscar/files/Compressed/{filename}"
     r = client.runs.new(command=f"wget -O data.txt.gz {data_url}", idempotent=True)
@@ -33,7 +31,7 @@ def download_data(cfg):
 
 
 def splitting_dataset(
-    cfg, data_cfg, raw_data_path, forced_run_id=None,
+    client, cfg, data_cfg, raw_data_path, forced_run_id=None,
 ):
     if forced_run_id:
         log.info(f"[{forced_run_id}] Splitting dataset... (forcedly cached)")
@@ -55,7 +53,7 @@ def splitting_dataset(
     return (r, f"runs/{r.id}/dataset")
 
 
-def create_tokenizer(cfg, data_path, forced_run_id=None):
+def create_tokenizer(client, cfg, data_path, forced_run_id=None):
     if forced_run_id:
         log.info(f"[{forced_run_id}] Training tokenizer... (forcedly cached)")
         return (None, f"runs/{forced_run_id}/tokenizer")
@@ -74,7 +72,7 @@ def create_tokenizer(cfg, data_path, forced_run_id=None):
     return (r, f"runs/{r.id}/tokenizer")
 
 
-def create_dataset(cfg, data_path, tokenizer_path, forced_run_id=None):
+def create_dataset(client, cfg, data_path, tokenizer_path, forced_run_id=None):
     if forced_run_id:
         log.info(f"[{forced_run_id}] Creating dataset... (forcedly cached)")
         return (None, f"runs/{forced_run_id}/dataset")
@@ -97,7 +95,7 @@ def create_dataset(cfg, data_path, tokenizer_path, forced_run_id=None):
     return (r, f"runs/{r.id}/dataset")
 
 
-def train_model(cfg, tokenizer_path, dataset_path):
+def train_model(client, cfg, tokenizer_path, dataset_path):
     r = client.runs.new(
         command=" ".join(
             [
@@ -107,15 +105,14 @@ def train_model(cfg, tokenizer_path, dataset_path):
                 "train_model",
                 "--tokenizer-dir",
                 "$PWD/tokenizer",
-                "--train-dataset",
-                "$PWD/dataset/train.lmdb",
-                "--eval-dataset",
-                "$PWD/dataset/valid.lmdb",
+                "--dataset-dir",
+                "$PWD/dataset",
                 "--out-dir",
                 "$PWD/model",
                 "--tensorboard-dir",
                 "$PWD/tensorboard",
                 "--fp16",
+                "--wandb",
             ]
         ),
         tensorboard_directory="tensorboard",
@@ -131,23 +128,29 @@ def train_model(cfg, tokenizer_path, dataset_path):
     return (r, f"runs/{r.id}/model")
 
 
-@hydra.main(config_path="config/config.yaml", strict=True)
-def main(cfg):
-    raw_data_run, raw_data_path = download_data(cfg.data)
-    wait(raw_data_run)
-
-    data_run, data_path = splitting_dataset(cfg.training, cfg.data, raw_data_path)
-    wait(data_run)
-
-    tokenizer_run, tokenizer_path = create_tokenizer(cfg, data_path, forced_run_id=246)
-    wait(tokenizer_run)
-
-    dataset_run, dataset_path = create_dataset(cfg, data_path, tokenizer_path)
-    wait(dataset_run)
-
-    model_run, model_path = train_model(cfg, tokenizer_path, dataset_path)
-    wait(model_run, logs=True)
+def arguments() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the whole workflow on spell.run")
+    return parser
 
 
-if __name__ == "__main__":
-    main()
+def run(args, cfg):
+    client = spell.client.from_environment()
+
+    raw_data_run, raw_data_path = download_data(client, cfg.data)
+    wait(client, raw_data_run)
+
+    data_run, data_path = splitting_dataset(
+        client, cfg.training, cfg.data, raw_data_path
+    )
+    wait(client, data_run)
+
+    tokenizer_run, tokenizer_path = create_tokenizer(
+        client, cfg, data_path, forced_run_id=246
+    )
+    wait(client, tokenizer_run)
+
+    dataset_run, dataset_path = create_dataset(client, cfg, data_path, tokenizer_path)
+    wait(client, dataset_run)
+
+    model_run, model_path = train_model(client, cfg, tokenizer_path, dataset_path)
+    wait(client, model_run, logs=True)

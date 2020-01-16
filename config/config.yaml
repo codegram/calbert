@@ -5,7 +5,7 @@ data:
   valid_split: 0.04
 
 vocab:
-  size: 30000
+  max_size: 30000
   min_frequency: 2
   lowercase: True
 

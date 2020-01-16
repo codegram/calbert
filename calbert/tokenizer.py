@@ -69,7 +69,7 @@ class CalbertTokenizer(BaseTokenizer):
     def train(
         self,
         files: Union[str, List[str]],
-        vocab_size: int = 30000,
+        max_vocab_size: int = 30000,
         min_frequency: int = 2,
         special_tokens: List[str] = ["<unk>"],
         limit_alphabet: int = 1000,
@@ -79,7 +79,7 @@ class CalbertTokenizer(BaseTokenizer):
         """ Train the model using the given files """
 
         trainer = trainers.BpeTrainer.new(
-            vocab_size=vocab_size,
+            vocab_size=max_vocab_size,
             min_frequency=min_frequency,
             special_tokens=special_tokens,
             limit_alphabet=limit_alphabet,
@@ -96,6 +96,10 @@ class CalbertTokenizer(BaseTokenizer):
     @property
     def pad_token_id(self):
         return self.token_to_id("<pad>")
+
+    @property
+    def mask_token_id(self):
+        return self.token_to_id("[MASK]")
 
     def process(self, sequence: str, pair: Optional[str] = None, max_seq_len: int = 0):
         enc = self.encode(sequence, pair)
@@ -126,11 +130,13 @@ def arguments() -> argparse.ArgumentParser:
 def train(args, cfg) -> Tokenizer:
     log.info(f"Training tokenizer: {args}")
 
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+
     tokenizer = CalbertTokenizer()
 
     tokenizer.train(
         [path_to_str(args.input_file)],
-        vocab_size=cfg.vocab.size,
+        max_vocab_size=cfg.vocab.max_size,
         min_frequency=cfg.vocab.min_frequency,
         special_tokens=["<unk>", "<pad>", "[MASK]", "[SEP]", "[CLS]"],
     )

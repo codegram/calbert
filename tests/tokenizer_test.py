@@ -8,6 +8,8 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from calbert import tokenizer
 
+from .conftest import InputData, folder
+
 
 def train_tokenizer(
     input_file_and_outdir: (str, str)
@@ -25,7 +27,7 @@ def tokenizer_args_and_cfg(
         ["--input-file", input_file, "--out-dir", outdir]
     )
     config = [
-        "vocab.size=10",
+        "vocab.max_size=10",
         "vocab.min_frequency=2",
         "vocab.lowercase=True",
     ]
@@ -33,24 +35,11 @@ def tokenizer_args_and_cfg(
     return args, cfg
 
 
-training_text = [
-    "Porto posat l'esquinç al peu sense sutura marejant metges i perdius i això no es cura.",
-    "La sang s’ha cuit fins a tornar-se dura i passa el temps i passa i això no es cura.",
-    "Camí de massa ampla tessitura estintolada, encara sobre la corda insegura.",
-]
-
-validation_text = ["La corda insegura s'ha cuit"]
-
-
 @pytest.fixture(scope="module")
 def input_file_and_outdir(which="train") -> (str, str):
-    with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as input_file:
-        with tempfile.TemporaryDirectory() as outdir:
-            for text in training_text if which == "train" else validation_text:
-                input_file.write(text + "\n")
-            filename = input_file.name
-            input_file.flush()
-            yield filename, outdir
+    with InputData("train") as train_file:
+        with folder() as outdir:
+            yield train_file, outdir
 
 
 @pytest.mark.describe("tokenizer.CalbertTokenizer")
@@ -59,7 +48,7 @@ class TestCalbertokenizer:
     def test_train(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
 
-        assert len(t) == 38
+        assert len(t) == 39
         assert t.id_to_token(0) == "<unk>"
         assert t.id_to_token(1) == "<pad>"
         assert t.id_to_token(2) == "[MASK]"
@@ -100,8 +89,8 @@ class TestCalbertokenizer:
         _, outdir = train_tokenizer(input_file_and_outdir)
 
         assert glob.glob(outdir + "/*") == [
-            outdir + "/ca.bpe.38-vocab.json",
-            outdir + "/ca.bpe.38-merges.txt",
+            outdir + "/ca.bpe.39-vocab.json",
+            outdir + "/ca.bpe.39-merges.txt",
         ]
 
     @pytest.mark.it("Encodes to a tensor with encoding_to_tensor")

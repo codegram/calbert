@@ -16,13 +16,13 @@ This would have been a ton of pain to build without [Huggingface](http://hugging
 
 Also, thanks to Google Research for creating and open-sourcing [ALBERT](https://github.com/google-research/ALBERT) in the first place.
 
-## Development
+## Training calbert from scratch
 
-### Running tests
+In most commands, you need to provide absolute paths with `$PWD` since these are Hydra runs and they don't run on the current directory.
 
-```bash
-make test
-```
+All config lives under `config`. There you can control parameters related to training, tokenizing, and everything, and even choose which version of the model to train.
+
+All configuration is overridable, since it's [Hydra](https://cli.dev) configuration. Check their docs.
 
 ### Getting the dataset
 
@@ -34,36 +34,26 @@ gunzip -c data.txt.gz | head -n 1000 > train.txt
 gunzip -c data.txt.gz | tail -n 200 > valid.txt
 ```
 
-### Configuration
-
-All config lives under `config`. There you can control parameters related to training, tokenizing, and everything, and even choose which version of the model to train.
-
-All configuration is overridable, since it's [Hydra](https://cli.dev) configuration. Check their docs.
-
 ### Training the tokenizer
 
 We're training the tokenizer only on the training set, not the validation set.
 
 ```bash
-mkdir -p tokenizer
-python calbert.py train_tokenizer --input-file $PWD/train.txt --out-dir $PWD/tokenizer
+python -m calbert train_tokenizer --input-file $PWD/train.txt --out-dir $PWD/tokenizer
 ```
 
 ### Producing the dataset
 
-The dataset is basically a distillation of the raw text data into fixed-length sentences represented by a triple of tensors `(token_ids, attention_mask, tensor_type_ids)`. Producing these triples is computationally expensive so we have a separate step for it.
+The dataset is basically a distillation of the raw text data into fixed-length sentences represented by a 4-tuple of tensors `(token_ids, special_tokens_mask, attention_mask, tensor_type_ids)`. Producing these tuples is computationally expensive so we have a separate step for it.
 
 ```bash
-mkdir -p dataset
-python calbert.py dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset
+python -m calbert dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset
 ```
 
 ### Training the model
 
-You need to provide absolute paths with `$PWD` since these are Hydra runs and they don't run on the current directory.
-
 ```bash
-python calbert.py train_model --tokenizer-dir $PWD/tokenizer --train-file $PWD/dataset/train.lmdb --eval-file $PWD/dataset/valid.lmdb --out-dir $PWD/model --tensorboard-dir $PWD/tensorboard
+python -m calbert train_model --tokenizer-dir $PWD/tokenizer --dataset-dir $PWD/dataset --out-dir $PWD/model --tensorboard-dir $PWD/tensorboard
 ```
 
 Warning, this is really slow! You probably want to run the full thing on GPUs. [Spell](https://spell.run) is our platform of choice.
@@ -72,4 +62,10 @@ Warning, this is really slow! You probably want to run the full thing on GPUs. [
 
 ```bash
 make workflow
+```
+
+### Running tests
+
+```bash
+make test
 ```

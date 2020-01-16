@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import warnings
 import random
 import pickle
 import re
@@ -32,9 +33,9 @@ try:
 except ImportError:
     from tensorboardX import SummaryWriter
 
-log = logging.getLogger(__name__)
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
-wandb.init(project="calbert", sync_tensorboard=True)
+log = logging.getLogger(__name__)
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -46,21 +47,15 @@ def arguments() -> argparse.ArgumentParser:
         help="The folder where ca.bpe.VOCABSIZE-vocab.json and ca.bpe.VOCABSIZE-merges.txt are",
     )
     parser.add_argument(
-        "--train-dataset",
+        "--dataset-dir",
         required=True,
         type=Path,
-        help="A processed pickled dataset, for training",
-    )
-    parser.add_argument(
-        "--eval-dataset",
-        required=True,
-        type=Path,
-        help="A processed pickled dataset, for evaluation",
+        help="Where the {train|vaild}.VOCABSIZE.*.npy files are.",
     )
     parser.add_argument(
         "--out-dir",
         default=None,
-        type=str,
+        type=Path,
         required=True,
         help="The output directory where the model predictions and checkpoints will be written.",
     )
@@ -119,6 +114,13 @@ def arguments() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--wandb",
+        type=bool,
+        default=False,
+        help="Log training to Weights and Biases",
+    )
+
+    parser.add_argument(
         "--local-rank",
         type=int,
         default=-1,
@@ -129,18 +131,18 @@ def arguments() -> argparse.ArgumentParser:
 
 def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
-    eval_output_dir = args.out_dir
+    eval_output_dir = path_to_str(args.out_dir)
 
-    eval_dataset = CalbertDataset(file_path=args.eval_dataset,)
+    valid_dataset = CalbertDataset(dataset_dir=args.dataset_dir, split='valid', max_seq_length=cfg.training.max_seq_length, max_vocab_size=cfg.vocab.max_size)
 
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(eval_output_dir)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
     # Note that DistributedSampler samples randomly
-    eval_sampler = SequentialSampler(eval_dataset)
+    eval_sampler = SequentialSampler(valid_dataset)
     eval_dataloader = DataLoader(
-        eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size
+        valid_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size
     )
 
     # multi-gpu evaluate
@@ -149,7 +151,7 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
 
     # Eval!
     log.info("***** Running evaluation {} *****".format(prefix))
-    log.info("  Num examples = %d", len(eval_dataset))
+    log.info("  Num examples = %d", len(valid_dataset))
     log.info("  Batch size = %d", args.eval_batch_size)
     eval_loss = 0.0
     nb_eval_steps = 0
@@ -207,7 +209,7 @@ def mask_tokens(
     labels[
         ~masked_indices
     ] = (
-        -1
+        -100
     )  # We only compute loss on masked tokens TODO: change to -100 once the change is merged in tranformers
 
     # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
@@ -222,7 +224,9 @@ def mask_tokens(
         & masked_indices
         & ~indices_replaced
     )
-    random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long)
+
+    le = len(tokenizer)
+    random_words = torch.randint(le, labels.shape, dtype=torch.long)
     inputs[indices_random] = random_words[indices_random]
 
     # The rest of the time (10% of the time) we keep the masked input tokens unchanged
@@ -237,7 +241,7 @@ def _rotate_checkpoints(args, checkpoint_prefix, use_mtime=False):
 
     # Check if we should delete older checkpoint(s)
     glob_checkpoints = glob.glob(
-        os.path.join(args.out_dir, "{}-*".format(checkpoint_prefix))
+        os.path.join(path_to_str(args.out_dir), "{}-*".format(checkpoint_prefix))
     )
     if len(glob_checkpoints) <= args.save_total_limit:
         return
@@ -325,15 +329,15 @@ def _train(args, cfg, dataset, model, tokenizer, device):
     )
 
     # Check if saved optimizer or scheduler states exist
-    if os.path.isfile(os.path.join(args.out_dir, "optimizer.pt")) and os.path.isfile(
-        os.path.join(args.out_dir, "scheduler.pt")
+    if os.path.isfile(os.path.join(path_to_str(args.out_dir), "optimizer.pt")) and os.path.isfile(
+        os.path.join(path_to_str(args.out_dir), "scheduler.pt")
     ):
         # Load in optimizer and scheduler states
         optimizer.load_state_dict(
-            torch.load(os.path.join(args.out_dir, "optimizer.pt"))
+            torch.load(os.path.join(path_to_str(args.out_dir), "optimizer.pt"))
         )
         scheduler.load_state_dict(
-            torch.load(os.path.join(args.out_dir, "scheduler.pt"))
+            torch.load(os.path.join(path_to_str(args.out_dir), "scheduler.pt"))
         )
 
     if args.fp16:
@@ -347,7 +351,8 @@ def _train(args, cfg, dataset, model, tokenizer, device):
             model, optimizer, opt_level=args.fp16_opt_level
         )
 
-    wandb.config.train_batch_size = train_batch_size
+    if args.wandb:
+        wandb.config.train_batch_size = train_batch_size
     # wandb.watch(model, log='all')
 
     # multi-gpu training (should be after apex fp16 initialization)
@@ -382,7 +387,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
     steps_trained_in_current_epoch = 0
 
     # Check if continuing training from a checkpoint
-    if os.path.exists(args.out_dir + "/" + args.model_name):
+    if os.path.exists(path_to_str(args.out_dir) + "/" + args.model_name):
         try:
             # set global_step to gobal_step of last saved checkpoint from model path
             checkpoint_suffix = args.model_name.split("-")[-1].split("/")[0]
@@ -408,11 +413,6 @@ def _train(args, cfg, dataset, model, tokenizer, device):
 
     tr_loss, logging_loss = 0.0, 0.0
 
-    model_to_resize = (
-        model.module if hasattr(model, "module") else model
-    )  # Take care of distributed/parallel training
-    model_to_resize.resize_token_embeddings(len(tokenizer))
-
     model.zero_grad()
     train_iterator = trange(
         epochs_trained,
@@ -433,7 +433,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                 steps_trained_in_current_epoch -= 1
                 continue
 
-            inputs, special_tokens_masks, attention_masks, token_type_ids = batch
+            inputs, special_tokens_masks, attention_masks, token_type_ids = batch.permute(1, 0, 2)
             inputs, labels = mask_tokens(inputs, special_tokens_masks, tokenizer, cfg)
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -491,16 +491,18 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                             tb_writer.add_scalar(
                                 "eval_{}".format(key), value, global_step
                             )
-                            wandb.log({f"val_{key}": value})
+                            if args.wandb:
+                                wandb.log({f"val_{key}": value})
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar(
                         "loss",
                         (tr_loss - logging_loss) / args.logging_steps,
                         global_step,
                     )
-                    wandb.log(
-                        {"tr_loss": (tr_loss - logging_loss) / args.logging_steps}
-                    )
+                    if args.wandb:
+                        wandb.log(
+                            {"tr_loss": (tr_loss - logging_loss) / args.logging_steps}
+                        )
                     logging_loss = tr_loss
 
                 if (
@@ -511,7 +513,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                     checkpoint_prefix = "checkpoint"
                     # Save model checkpoint
                     output_dir = os.path.join(
-                        args.out_dir, "{}-{}".format(checkpoint_prefix, global_step)
+                        path_to_str(args.out_dir), "{}-{}".format(checkpoint_prefix, global_step)
                     )
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
@@ -562,6 +564,11 @@ def set_seed(args, cfg):
 
 
 def train(args, cfg):
+    if args.wandb:
+        wandb.init(project="calbert", sync_tensorboard=True)
+
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+
     args.model_name = (
         f"calbert-{cfg.model.name}-{'uncased' if cfg.vocab.lowercase else 'cased'}"
     )
@@ -601,19 +608,32 @@ def train(args, cfg):
         path_to_str(next(args.tokenizer_dir.glob("*-merges.txt"))),
     )
 
-    c = dict(cfg.training)
-    for k in c.keys():
-        wandb.config[k] = c[k]
+    if args.wandb:
+        c = dict(cfg.training)
+        for k in c.keys():
+            wandb.config[k] = c[k]
 
     c = dict(cfg.model)
-    for k in c.keys():
-        wandb.config[k] = c[k]
+    if args.wandb:
+        for k in c.keys():
+            wandb.config[k] = c[k]
 
     config = AlbertConfig(**c)
 
-    model = AlbertForMaskedLM(config).to(device)
+    model = AlbertForMaskedLM(config)
 
-    train_dataset = CalbertDataset(file_path=args.train_dataset,)
+    # Hack until this is released: https://github.com/huggingface/transformers/commit/100e3b6f2133074bf746a78eb4c3a0ad3e939b5f#diff-961191c6a9886609f732e878f0a1fa30
+    # Otherwise the resizing doesn't apply for some layers
+    model.predictions.decoder.bias = model.predictions.bias
+
+    model_to_resize = (
+        model.module if hasattr(model, "module") else model
+    )  # Take care of distributed/parallel training
+    model_to_resize.resize_token_embeddings(len(tokenizer))
+
+    model = model.to(device)
+
+    train_dataset = CalbertDataset(dataset_dir=args.dataset_dir, split='train', max_seq_length=cfg.training.max_seq_length, max_vocab_size=cfg.vocab.max_size)
 
     log.info("Loaded %i examples", len(train_dataset))
 
@@ -626,20 +646,22 @@ def train(args, cfg):
     # Saving best-practices: if you use save_pretrained for the model and tokenizer, you can reload them using from_pretrained()
     if args.local_rank == -1 or torch.distributed.get_rank() == 0:
         # Create output directory if needed
-        if not os.path.exists(args.out_dir) and args.local_rank in [-1, 0]:
-            os.makedirs(args.out_dir)
+        if not os.path.exists(path_to_str(args.out_dir)) and args.local_rank in [-1, 0]:
+            os.makedirs(path_to_str(args.out_dir))
 
-        log.info("Saving model checkpoint to %s", args.out_dir)
+        log.info("Saving model checkpoint to %s", path_to_str(args.out_dir))
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         model_to_save = (
             model.module if hasattr(model, "module") else model
         )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(args.out_dir)
+        model_to_save.save_pretrained(path_to_str(args.out_dir))
 
         # Good practice: save your training arguments together with the trained model
-        torch.save(args, os.path.join(args.out_dir, "training_args.bin"))
+        torch.save(args, os.path.join(path_to_str(args.out_dir), "training_args.bin"))
 
         # Load a trained model and vocabulary that you have fine-tuned
-        model = AlbertForMaskedLM.from_pretrained(args.out_dir)
+        model = AlbertForMaskedLM.from_pretrained(path_to_str(args.out_dir))
         model.to(device)
+    
+    return model

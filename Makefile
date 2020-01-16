@@ -1,5 +1,5 @@
 workflow:
-	pipenv run spell workflow --repo repo=. --pip hydra-colorlog --pip hydra-core 'python workflow.py'
+	pipenv run spell workflow --repo repo=. --pip hydra-colorlog --pip hydra-core 'python -m calbert workflow'
 
 deps: Pipfile
 	pipenv install --dev
@@ -9,6 +9,6 @@ test:
 	pipenv run py.test
 
 lint:
-	pipenv run flake8 workflow.py calbert.py calbert/*.py
+	pipenv run flake8 calbert/*.py
 
 .PHONY: test cast lint

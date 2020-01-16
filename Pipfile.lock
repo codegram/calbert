@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "630532fea46555436d7f12cfcf7293f68fc96a66cc1c939e3abbf510e89ed87c"
+            "sha256": "0536c069d50b48f2696f5cf7a6883ff7348ef1e92986e8cce6801748b937ca53"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -18,17 +18,17 @@
     "default": {
         "boto3": {
             "hashes": [
-                "sha256:3fa0cd930c4f920b358ed3493102866c96bef2049448ca34c60dcbf9108d8674",
-                "sha256:595c8059320816e7ea6760247076e7462b88212d0bf76d0bb068ec16ae555231"
+                "sha256:916efdecda945daba08dca9032373440db681e53e6b46e7d0cae104ffd5ac7ca",
+                "sha256:925899699b81977b75d4036fc478209916f4547f8683e5c7b1ad678317a6652e"
             ],
-            "version": "==1.11.1"
+            "version": "==1.11.3"
         },
         "botocore": {
             "hashes": [
-                "sha256:c8ad999088b4122039b48ea88b03fa85a97fbb568402a2ce3fde516e46dddab6",
-                "sha256:dabbf85f006ea79fde8c0a7dcc583aa5c45213e9866ddbfee1c5482abd300874"
+                "sha256:799562d2af023f49518676c6b72ee07325da027513406b4b9d8e5b74ecea8257",
+                "sha256:80e6522c4bb8d98dab9fd77708c6722bee775c7b85a77326ef44543062a17462"
             ],
-            "version": "==1.14.1"
+            "version": "==1.14.3"
         },
         "certifi": {
             "hashes": [
@@ -276,10 +276,10 @@
         },
         "six": {
             "hashes": [
-                "sha256:1f1b7d42e254082a9db6279deae68afb421ceba6158efa6131de7b3003ee93fd",
-                "sha256:30f610279e8b2578cab6db20741130331735c781b56053c59c4076da27f06b66"
+                "sha256:236bdbdce46e6e6a3d61a337c0f8b763ca1e8717c03b369e87a7ec7ce1319c0a",
+                "sha256:8f3cd2e254d8f793e7f3d6d9df77b92252b52637291d0f0da013c76ea2724b6c"
             ],
-            "version": "==1.13.0"
+            "version": "==1.14.0"
         },
         "tensorboardx": {
             "hashes": [
@@ -693,6 +693,15 @@
             ],
             "version": "==0.2.0"
         },
+        "rope": {
+            "hashes": [
+                "sha256:52423a7eebb5306a6d63bdc91a7c657db51ac9babfb8341c9a1440831ecf3203",
+                "sha256:ae1fa2fd56f64f4cc9be46493ce54bed0dd12dee03980c61a4393d89d84029ad",
+                "sha256:d2830142c2e046f5fc26a022fe680675b6f48f81c7fc1f03a950706e746e9dfe"
+            ],
+            "index": "pypi",
+            "version": "==0.16.0"
+        },
         "sentry-sdk": {
             "hashes": [
                 "sha256:8e2d38dc58dc992280487e553ec3d97a424e4d179f4fad802ef3b08f64ccf4d8",
@@ -708,10 +717,10 @@
         },
         "six": {
             "hashes": [
-                "sha256:1f1b7d42e254082a9db6279deae68afb421ceba6158efa6131de7b3003ee93fd",
-                "sha256:30f610279e8b2578cab6db20741130331735c781b56053c59c4076da27f06b66"
+                "sha256:236bdbdce46e6e6a3d61a337c0f8b763ca1e8717c03b369e87a7ec7ce1319c0a",
+                "sha256:8f3cd2e254d8f793e7f3d6d9df77b92252b52637291d0f0da013c76ea2724b6c"
             ],
-            "version": "==1.13.0"
+            "version": "==1.14.0"
         },
         "smmap2": {
             "hashes": [
@@ -722,10 +731,10 @@
         },
         "spell": {
             "hashes": [
-                "sha256:7d094e2c46ba04c3576f0a105f1678561a50aaf25d74e77dd40f4f1ec59cece7"
+                "sha256:62d15e9365b801d83329be49b5f0243661d72b201c5fd8921a3d619969f1a7c1"
             ],
             "index": "pypi",
-            "version": "==0.32.3"
+            "version": "==0.32.5"
         },
         "spinners": {
             "hashes": [
@@ -761,11 +770,11 @@
         },
         "wandb": {
             "hashes": [
-                "sha256:7e48024ce64a65d0d02b5937c95a630920d375da949f4ec2d884f9b9a3387386",
-                "sha256:ebd63815f56033b527252a9e8d633fb7234fb857af9744756bd0469c9210e8e9"
+                "sha256:33f6569e3f7c2c7c12f118e46c8fd26a517bb0bea5df781cd3ce0dc419123c1b",
+                "sha256:3e2ed52151de43b57392ef72473daae7cb1164eb011a89777b5d969dde9e78f5"
             ],
             "index": "pypi",
-            "version": "==0.8.20"
+            "version": "==0.8.21"
         },
         "watchdog": {
             "hashes": [

@@ -16,7 +16,6 @@ class InputData:
         self.file = tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8")
 
     def __enter__(self, **args):
-        print("ENTER", args)
         self.file.__enter__(**args)
         for text in training_text if self.which == "train" else validation_text:
             self.file.write(text + "\n")
