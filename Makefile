@@ -11,4 +11,7 @@ test:
 lint:
 	pipenv run flake8 calbert/*.py
 
-.PHONY: test cast lint
+clean:
+	rm -fr run train.txt valid.txt tokenizer dataset calbert/__pycache__
+
+.PHONY: test cast lint clean
