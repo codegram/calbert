@@ -1,12 +1,13 @@
 import spell.client
 import argparse
+from pathlib import Path
 import logging
 
 log = logging.getLogger(__name__)
 
-packages = [
-    dep.strip() for dep in open("../requirements.txt").readlines() if "==" in dep
-]
+reqs = open((Path(__file__) / "../../requirements.txt").resolve()).readlines()
+
+packages = [dep.strip() for dep in reqs if "==" in dep]
 
 
 def wait(client, run, logs=False):

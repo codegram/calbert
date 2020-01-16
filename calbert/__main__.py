@@ -16,7 +16,7 @@ TASKS = {
     "train_tokenizer": tokenizer.train,
     "train_model": training.train,
     "dataset": dataset.process,
-    "workflow": workflow.spawn,
+    "workflow": workflow.run,
 }
 PARSERS = {
     "train_tokenizer": tokenizer.arguments,
