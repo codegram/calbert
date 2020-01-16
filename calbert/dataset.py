@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm, trange
 
-from .tokenizer import CalbertTokenizer, encoding_to_tensor
+from .tokenizer import CalbertTokenizer
 from .utils import path_to_str
 
 log = logging.getLogger(__name__)

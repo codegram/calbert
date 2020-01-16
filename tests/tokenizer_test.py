@@ -5,7 +5,10 @@ import glob
 import argparse
 from pathlib import Path
 
+import torch
+from tokenizers import Encoding
 from omegaconf import OmegaConf
+
 from calbert import tokenizer
 
 from .conftest import InputData, folder
@@ -40,6 +43,17 @@ def input_file_and_outdir(which="train") -> (str, str):
     with InputData("train") as train_file:
         with folder() as outdir:
             yield train_file, outdir
+
+
+def encoding_to_tensor(e: Encoding) -> torch.Tensor:
+    return torch.stack(
+        [
+            torch.tensor(e.ids),
+            torch.tensor(e.special_tokens_mask),
+            torch.tensor(e.attention_mask),
+            torch.tensor(e.type_ids),
+        ]
+    )
 
 
 @pytest.mark.describe("tokenizer.CalbertTokenizer")
@@ -92,17 +106,3 @@ class TestCalbertokenizer:
             outdir + "/ca.bpe.39-vocab.json",
             outdir + "/ca.bpe.39-merges.txt",
         ]
-
-    @pytest.mark.it("Encodes to a tensor with encoding_to_tensor")
-    def test_encoding_to_tensor(self, input_file_and_outdir):
-        t, outdir = train_tokenizer(input_file_and_outdir)
-
-        e = t.process("hello", max_seq_len=10)
-        tensor = tokenizer.encoding_to_tensor(e)
-
-        assert tensor.shape == (4, 10)
-
-        assert tensor[0].tolist() == e.ids
-        assert tensor[1].tolist() == e.special_tokens_mask
-        assert tensor[2].tolist() == e.attention_mask
-        assert tensor[3].tolist() == e.type_ids

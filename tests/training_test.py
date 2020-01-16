@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 
 from calbert import dataset, training, tokenizer
 
-from .tokenizer_test import train_tokenizer
+from .tokenizer_test import train_tokenizer, encoding_to_tensor
 from .conftest import InputData, folder
 
 
@@ -98,7 +98,7 @@ class TestTraining:
             special_tokens_mask,
             attention_mask,
             type_ids,
-        ) = tokenizer.encoding_to_tensor(encoding)
+        ) = encoding_to_tensor(encoding)
 
         masked_token_ids, labels = training.mask_tokens(
             token_ids, special_tokens_mask=special_tokens_mask, tokenizer=tok, cfg=cfg,

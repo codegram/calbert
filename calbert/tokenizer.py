@@ -109,17 +109,6 @@ class CalbertTokenizer(BaseTokenizer):
         return enc
 
 
-def encoding_to_tensor(e: Encoding) -> torch.Tensor:
-    return torch.stack(
-        [
-            torch.tensor(e.ids),
-            torch.tensor(e.special_tokens_mask),
-            torch.tensor(e.attention_mask),
-            torch.tensor(e.type_ids),
-        ]
-    )
-
-
 def arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train a tokenizer on some raw text")
     parser.add_argument("--input-file", type=Path)

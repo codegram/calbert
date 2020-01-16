@@ -33,7 +33,7 @@ try:
 except ImportError:
     from tensorboardX import SummaryWriter
 
-warnings.filterwarnings("ignore", category=DeprecationWarning) 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 log = logging.getLogger(__name__)
 
@@ -663,5 +663,5 @@ def train(args, cfg):
         # Load a trained model and vocabulary that you have fine-tuned
         model = AlbertForMaskedLM.from_pretrained(path_to_str(args.out_dir))
         model.to(device)
-    
+
     return model
