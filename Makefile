@@ -1,5 +1,5 @@
 workflow:
-	pipenv run spell workflow --repo repo=. --pip hydra-colorlog --pip hydra-core 'python -m calbert workflow'
+	pipenv run spell workflow --pip-req requirements.txt --repo repo=. 'python -m calbert workflow'
 
 deps: Pipfile
 	pipenv install --dev
