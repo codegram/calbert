@@ -16,6 +16,36 @@ This would have been a ton of pain to build without [Huggingface](http://hugging
 
 Also, thanks to Google Research for creating and open-sourcing [ALBERT](https://github.com/google-research/ALBERT) in the first place.
 
+## What on earth is an ALBERT?
+
+ALBERT is a Language Model, that is, a neural network that can learn sequences with certain structure, such as sentences in natural language (but not only natural language!).
+
+But how do they learn language? Different language models are trained with different **pretext tasks**, namely challenges that you give them so that they can learn how language works. The idea is that in order to get reaosnably good at this one task they must indirectly learn the grammar of the language, and even its semantics and style.
+
+Traditional (also known as **causal**) language models are usually trained with the task of **predicting the next word** in a sequence, like this:
+
+- Input: "the dog was eating very [BLANK]"
+- Correct output: "quickly"
+
+However, ALBERT is of another family called **masked language models**. In this family, the pretext task they have to learn is similar, but instead of always predicting the last word in a sequence, some words in the sentence are randomly turned into blanks (or **masked**), like this:
+
+- Input: "the [BLANK] was eating very [BLANK]"
+- Correct output: "dog", "quickly"
+
+This task is a little more difficult, and more importantly, requires understanding the context surrounding a blank much better.
+
+### How are those pretext tasks anything more than a pointless waste of electricity?
+
+Turns out, once a language model gets really, really good at this rather pointless pretext task, it can be easily repurposed for much more interesting tasks.
+
+Once a language learns grammar and semantics, it can become a very good classifier of sentences, and even whole documents, for example.
+
+If you then teach it to classify tweets or documents into categories (or identify sentiment, or toxicity for example) it no longer sees just a bunch of confusing characters, but rather it's "reading" the document at a much more abstract level, so it can "make sense" of it much more readily. (Note the air quotes, this is not magic but it is probably the closest thing.)
+
+### Why ALBERT in Catalan?
+
+Because there are no language models in Catalan! And there's a lot of Catalan text to be processed. (In Catalonia).
+
 ## Training calbert from scratch
 
 In most commands, you need to provide absolute paths with `$PWD` since these are Hydra runs and they don't run on the current directory.
