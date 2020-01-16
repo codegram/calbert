@@ -102,7 +102,11 @@ class TestCalbertokenizer:
     def test_saves_tokenizer(self, input_file_and_outdir):
         _, outdir = train_tokenizer(input_file_and_outdir)
 
-        assert glob.glob(outdir + "/*") == [
+        got = list(glob.glob(outdir + "/*"))
+        got.sort()
+        expected = [
             outdir + "/ca.bpe.39-vocab.json",
             outdir + "/ca.bpe.39-merges.txt",
         ]
+        expected.sort()
+        assert got == expected
