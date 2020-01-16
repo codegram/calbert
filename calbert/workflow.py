@@ -24,7 +24,7 @@ def wait(client, run, logs=False):
 def download_data(client, cfg):
     filename = "ca_dedup.txt.gz" if cfg.dedup else "ca.txt.gz"
     data_url = f"https://traces1.inria.fr/oscar/files/Compressed/{filename}"
-    r = client.runs.new(command=f"wget -O data.txt.gz {data_url}", idempotent=True)
+    r = client.runs.new(command=f"wget -O data.txt.gz {data_url}")  # idempotent=True
     log.info(
         f"[{r.id}] Downloading data... ({'cached' if r.already_existed else 'running'})"
     )
@@ -46,7 +46,8 @@ def splitting_dataset(
     mv dataset/aa dataset/train.txt && mv dataset/ab dataset/valid.txt
     """
     r = client.runs.new(
-        command=cmd, attached_resources={raw_data_path: "data.txt.gz"}, idempotent=True,
+        command=cmd,
+        attached_resources={raw_data_path: "data.txt.gz"},  # idempotent=True,
     )
     log.info(
         f"[{r.id}] Splitting dataset... ({'cached' if r.already_existed else 'running'})"
@@ -65,7 +66,7 @@ def create_tokenizer(client, cfg, data_path, forced_run_id=None):
         machine_type="cpu-big",
         pip_packages=packages,
         attached_resources={f"{data_path}/train.txt": "train.txt"},
-        idempotent=True,
+        # idempotent=True,
     )
     log.info(
         f"[{r.id}] Training tokenizer... ({'cached' if r.already_existed else 'running'})"
@@ -88,7 +89,7 @@ def create_dataset(client, cfg, data_path, tokenizer_path, forced_run_id=None):
             f"{data_path}/valid.txt": "valid.txt",
             tokenizer_path: "tokenizer",
         },
-        idempotent=True,
+        # idempotent=True,
     )
     log.info(
         f"[{r.id}] Creating dataset... ({'cached' if r.already_existed else 'running'})"
@@ -121,7 +122,7 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
         machine_type="p100",
         pip_packages=packages,
         attached_resources={tokenizer_path: "tokenizer", dataset_path: "dataset"},
-        idempotent=True,
+        # idempotent=True,
     )
     log.info(
         f"[{r.id}] Training model... ({'cached' if r.already_existed else 'running'})"
@@ -145,9 +146,7 @@ def run(args, cfg):
     )
     wait(client, data_run)
 
-    tokenizer_run, tokenizer_path = create_tokenizer(
-        client, cfg, data_path, forced_run_id=246
-    )
+    tokenizer_run, tokenizer_path = create_tokenizer(client, cfg, data_path)
     wait(client, tokenizer_run)
 
     dataset_run, dataset_path = create_dataset(client, cfg, data_path, tokenizer_path)
