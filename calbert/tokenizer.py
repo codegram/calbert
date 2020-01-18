@@ -57,7 +57,6 @@ class CalbertTokenizer(BaseTokenizer):
         tokenizer.decoder = decoders.Metaspace.new(
             replacement=replacement, add_prefix_space=add_prefix_space
         )
-        print(max_seq_length, type(max_seq_length))
         tokenizer.enable_truncation(max_length=max_seq_length)
         tokenizer.post_processor = BertProcessing.new(("[SEP]", 3), ("[CLS]", 4))
 

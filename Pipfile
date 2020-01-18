@@ -23,4 +23,4 @@ lmdb = "==0.98"
 transformers = "==2.3.0"
 
 [requires]
-python_version = "3.7.5"
+python_version = "3.7.6"
