@@ -44,17 +44,15 @@ def _process_file(
 ):
     assert minibatch_size > 0
     num_lines = sum(1 for line in open(path_to_str(input_file), "r"))
-    input_text = map(
-        lambda minibatch: filter(lambda line: line is not None, minibatch),
-        chunk(
-            tqdm(
-                open(path_to_str(input_file), encoding="utf-8"),
-                desc="Tokenizing",
-                total=num_lines,
+    input_text = tqdm(
+        map(
+            lambda minibatch: filter(lambda line: line is not None, minibatch),
+            chunk(
+                open(path_to_str(input_file), encoding="utf-8"), minibatch_size, None,
             ),
-            minibatch_size,
-            None,
         ),
+        desc="Tokenizing",
+        total=int(num_lines / minibatch_size),
     )
 
     with open(

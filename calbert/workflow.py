@@ -88,7 +88,7 @@ def create_dataset(client, cfg, data_path, tokenizer_path, forced_run_id=None):
             f"{data_path}/valid.txt": "valid.txt",
             tokenizer_path: "tokenizer",
         },
-        # idempotent=True,
+        idempotent=True,
     )
     log.info(
         f"[{r.id}] Creating dataset... ({'cached' if r.already_existed else 'running'})"
@@ -150,7 +150,7 @@ def run(args, cfg):
     )
     wait(client, tokenizer_run)
 
-    dataset_run, dataset_path = create_dataset(client, cfg, data_path, tokenizer_path)
+    dataset_run, dataset_path = create_dataset(client, cfg, data_path, tokenizer_path, forced_run_id=315)
     wait(client, dataset_run)
 
     model_run, model_path = train_model(client, cfg, tokenizer_path, dataset_path)
