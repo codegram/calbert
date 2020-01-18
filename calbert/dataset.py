@@ -1,5 +1,6 @@
 import argparse
 import logging
+import itertools
 import pickle
 import io
 from pathlib import Path
@@ -26,6 +27,12 @@ def arguments() -> argparse.ArgumentParser:
     return parser
 
 
+def chunk(iterable, n, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # chunk('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    yield from itertools.zip_longest(*[iter(iterable)] * n, fillvalue=fillvalue)
+
+
 def _process_file(
     tokenizer: CalbertTokenizer,
     input_file: Path,
@@ -33,12 +40,21 @@ def _process_file(
     split: str,
     max_seq_length: int,
     max_vocab_size: int,
+    minibatch_size: int,
 ):
+    assert minibatch_size > 0
     num_lines = sum(1 for line in open(path_to_str(input_file), "r"))
-    input_text = tqdm(
-        open(path_to_str(input_file), encoding="utf-8"),
-        desc="Tokenizing",
-        total=num_lines,
+    input_text = map(
+        lambda minibatch: filter(lambda line: line is not None, minibatch),
+        chunk(
+            tqdm(
+                open(path_to_str(input_file), encoding="utf-8"),
+                desc="Tokenizing",
+                total=num_lines,
+            ),
+            minibatch_size,
+            None,
+        ),
     )
 
     with open(
@@ -82,16 +98,22 @@ def _process_file(
         mode="w+",
         shape=(num_lines, max_seq_length),
     )
-    for idx, line in enumerate(input_text):
-        e = tokenizer.process(line.strip())
-        ids_np[idx, :] = np.array(e.ids, dtype=ids_type)
-        special_tokens_mask_np[idx, :] = np.array(
-            e.special_tokens_mask, dtype=special_tokens_mask_type
+    for minibatch_idx, lines in enumerate(input_text):
+        start_idx = minibatch_idx * minibatch_size
+        end_idx = start_idx + minibatch_size
+        encodings = tokenizer.encode_batch([line.strip() for line in lines])
+        ids_np[start_idx:end_idx, :] = np.array(
+            [e.ids for e in encodings], dtype=ids_type
         )
-        attention_mask_np[idx, :] = np.array(
-            e.attention_mask, dtype=attention_mask_type
+        special_tokens_mask_np[start_idx:end_idx, :] = np.array(
+            [e.special_tokens_mask for e in encodings], dtype=special_tokens_mask_type
         )
-        type_ids_np[idx, :] = np.array(e.type_ids, dtype=type_ids_type)
+        attention_mask_np[start_idx:end_idx, :] = np.array(
+            [e.attention_mask for e in encodings], dtype=attention_mask_type
+        )
+        type_ids_np[start_idx:end_idx, :] = np.array(
+            [e.type_ids for e in encodings], dtype=type_ids_type
+        )
 
     del ids_np
     del special_tokens_mask_np
@@ -120,6 +142,7 @@ def process(args, cfg):
         split="train",
         max_seq_length=cfg.training.max_seq_length,
         max_vocab_size=cfg.vocab.max_size,
+        minibatch_size=cfg.data.processing_minibatch_size,
     )
     _process_file(
         tokenizer,
@@ -128,6 +151,7 @@ def process(args, cfg):
         split="valid",
         max_seq_length=cfg.training.max_seq_length,
         max_vocab_size=cfg.vocab.max_size,
+        minibatch_size=cfg.data.processing_minibatch_size,
     )
 
     log.info(

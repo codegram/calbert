@@ -1,7 +1,7 @@
 import logging
 import argparse
 from pathlib import Path
-from typing import Collection
+from typing import Tuple
 
 import torch
 from tokenizers import pre_tokenizers, decoders, trainers, Tokenizer, Encoding
@@ -58,6 +58,7 @@ class CalbertTokenizer(BaseTokenizer):
             replacement=replacement, add_prefix_space=add_prefix_space
         )
         tokenizer.enable_truncation(max_length=max_seq_length)
+        tokenizer.enable_padding(pad_token="<pad>", pad_id=1, max_length=max_seq_length)
         tokenizer.post_processor = BertProcessing.new(("[SEP]", 3), ("[CLS]", 4))
 
         parameters = {
@@ -94,21 +95,16 @@ class CalbertTokenizer(BaseTokenizer):
             files = [files]
         self._tokenizer.train(trainer, files)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._tokenizer.get_vocab_size()
 
     @property
-    def pad_token_id(self):
+    def pad_token_id(self) -> int:
         return self.token_to_id("<pad>")
 
     @property
-    def mask_token_id(self):
+    def mask_token_id(self) -> int:
         return self.token_to_id("[MASK]")
-
-    def process(self, sequence: str, pair: Optional[str] = None):
-        enc = self.encode(sequence, pair)
-        enc.pad(self.max_seq_length, pad_token="<pad>", pad_id=self.pad_token_id)
-        return enc
 
 
 def arguments() -> argparse.ArgumentParser:

@@ -11,7 +11,8 @@ pytest-concurrent = "*"
 pytest-testdox = "*"
 flake8 = "*"
 rope = "*"
-spotty = { editable = true, ref = 'dev', git = "git://github.com/apls777/spotty" }
+spotty = {editable = true,ref = 'dev',git = "git://github.com/apls777/spotty"}
+black = "*"
 
 [packages]
 hydra-core = "*"
@@ -23,3 +24,6 @@ transformers = ">=2.3.0"
 
 [requires]
 python_version = "3.7.6"
+
+[pipenv]
+allow_prereleases = true

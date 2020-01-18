@@ -73,14 +73,14 @@ class TestCalbertokenizer:
     @pytest.mark.it("Encodes single sentences BERT-style with CLS and SEP")
     def test_single_sentence_encoding(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
-        encoded = t.process("hola com anem")
+        encoded = t.encode("hola com anem")
         assert t.id_to_token(encoded.ids[0]) == "[CLS]"
         assert t.id_to_token(encoded.ids[-1]) == "[SEP]"
 
     @pytest.mark.it("Encodes pairs of sentences BERT-style with CLS and SEP")
     def test_sentence_pair_encoding(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
-        encoded = t.process("hola com anem", "molt be i tu")
+        encoded = t.encode("hola com anem", "molt be i tu")
         assert t.id_to_token(encoded.ids[0]) == "[CLS]"
         assert t.id_to_token(encoded.ids[15]) == "[SEP]"
         assert t.id_to_token(encoded.ids[-1]) == "[SEP]"
@@ -91,7 +91,7 @@ class TestCalbertokenizer:
     def test_truncates_encodings(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
 
-        encoded = t.process("hola com anem")
+        encoded = t.encode("hola com anem")
         assert len(encoded.tokens) == 12
         assert encoded.tokens == [
             "[CLS]",
@@ -112,7 +112,7 @@ class TestCalbertokenizer:
     def test_pads_encodings(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
 
-        encoded = t.process("hola")
+        encoded = t.encode("hola")
         assert encoded.tokens == [
             "[CLS]",
             "▁",
@@ -127,6 +127,13 @@ class TestCalbertokenizer:
             "<pad>",
             "<pad>",
         ]
+
+    @pytest.mark.it("Encodes a batch of sentences")
+    def test_batch_encoding(self, input_file_and_outdir):
+        t, outdir = train_tokenizer(input_file_and_outdir)
+        first, second = t.encode_batch(["hola", "genial"])
+        assert len(first.tokens) == 12
+        assert len(second.tokens) == 12
 
     @pytest.mark.it("Saves the tokenizer's vocab and merges")
     def test_saves_tokenizer(self, input_file_and_outdir):

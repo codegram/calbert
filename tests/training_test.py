@@ -92,7 +92,7 @@ class TestTraining:
 
         model = training.train(args, cfg)
 
-        encoding = tok.process("Hola com anem")
+        encoding = tok.encode("Hola com anem")
         (
             token_ids,
             special_tokens_mask,
