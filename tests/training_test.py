@@ -108,4 +108,4 @@ class TestTraining:
 
         predictions = model(batch_inputs, token_type_ids=type_ids.unsqueeze(0))[0][0]
 
-        assert predictions.shape == (16, 39)
+        assert predictions.shape == (cfg.training.max_seq_length, len(tok))

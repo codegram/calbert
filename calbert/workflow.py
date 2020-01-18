@@ -24,7 +24,7 @@ def wait(client, run, logs=False):
 def download_data(client, cfg):
     filename = "ca_dedup.txt.gz" if cfg.dedup else "ca.txt.gz"
     data_url = f"https://traces1.inria.fr/oscar/files/Compressed/{filename}"
-    r = client.runs.new(command=f"wget -O data.txt.gz {data_url}")  # idempotent=True
+    r = client.runs.new(command=f"wget -O data.txt.gz {data_url}", idempotent=True)
     log.info(
         f"[{r.id}] Downloading data... ({'cached' if r.already_existed else 'running'})"
     )
@@ -46,8 +46,7 @@ def splitting_dataset(
     mv dataset/aa dataset/train.txt && mv dataset/ab dataset/valid.txt
     """
     r = client.runs.new(
-        command=cmd,
-        attached_resources={raw_data_path: "data.txt.gz"},  # idempotent=True,
+        command=cmd, attached_resources={raw_data_path: "data.txt.gz"}, idempotent=True,
     )
     log.info(
         f"[{r.id}] Splitting dataset... ({'cached' if r.already_existed else 'running'})"
@@ -66,7 +65,7 @@ def create_tokenizer(client, cfg, data_path, forced_run_id=None):
         machine_type="cpu-big",
         pip_packages=packages,
         attached_resources={f"{data_path}/train.txt": "train.txt"},
-        # idempotent=True,
+        idempotent=True,
     )
     log.info(
         f"[{r.id}] Training tokenizer... ({'cached' if r.already_existed else 'running'})"

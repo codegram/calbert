@@ -604,8 +604,9 @@ def train(args, cfg):
         torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
     tokenizer = CalbertTokenizer(
-        path_to_str(next(args.tokenizer_dir.glob("*-vocab.json"))),
-        path_to_str(next(args.tokenizer_dir.glob("*-merges.txt"))),
+        max_seq_length=cfg.training.max_seq_length,
+        vocab_file=path_to_str(next(args.tokenizer_dir.glob("*-vocab.json"))),
+        merges_file=path_to_str(next(args.tokenizer_dir.glob("*-merges.txt"))),
     )
 
     if args.wandb:

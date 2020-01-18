@@ -33,6 +33,7 @@ def tokenizer_args_and_cfg(
         "vocab.max_size=10",
         "vocab.min_frequency=2",
         "vocab.lowercase=True",
+        "training.max_seq_length=12",
     ]
     cfg = OmegaConf.from_dotlist(config)
     return args, cfg
@@ -84,19 +85,48 @@ class TestCalbertokenizer:
         assert t.id_to_token(encoded.ids[15]) == "[SEP]"
         assert t.id_to_token(encoded.ids[-1]) == "[SEP]"
 
-    @pytest.mark.it("Truncates encodings to a max sequence length")
+    @pytest.mark.it(
+        "Truncates encodings to the max sequence length, respecting special tokens"
+    )
     def test_truncates_encodings(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
 
-        encoded = t.process("hola com anem", max_seq_len=12)
-        assert encoded.tokens[-1] == "a"
+        encoded = t.process("hola com anem")
+        assert len(encoded.tokens) == 12
+        assert encoded.tokens == [
+            "[CLS]",
+            "▁",
+            "h",
+            "o",
+            "l",
+            "a",
+            "▁",
+            "c",
+            "o",
+            "m",
+            "▁",
+            "[SEP]",
+        ]
 
-    @pytest.mark.it("Pads encodings up to a max sequence length")
+    @pytest.mark.it("Pads encodings up to the max sequence length")
     def test_pads_encodings(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
 
-        encoded = t.process("hola com anem", max_seq_len=100)
-        assert encoded.tokens[-1] == "<pad>"
+        encoded = t.process("hola")
+        assert encoded.tokens == [
+            "[CLS]",
+            "▁",
+            "h",
+            "o",
+            "l",
+            "a",
+            "[SEP]",
+            "<pad>",
+            "<pad>",
+            "<pad>",
+            "<pad>",
+            "<pad>",
+        ]
 
     @pytest.mark.it("Saves the tokenizer's vocab and merges")
     def test_saves_tokenizer(self, input_file_and_outdir):

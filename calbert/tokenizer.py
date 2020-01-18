@@ -23,14 +23,16 @@ class CalbertTokenizer(BaseTokenizer):
     """
 
     @classmethod
-    def from_dir(cls, tokenizer_dir: Path):
+    def from_dir(cls, tokenizer_dir: Path, max_seq_length: int):
         return CalbertTokenizer(
-            path_to_str(next(tokenizer_dir.glob("*-vocab.json"))),
-            path_to_str(next(tokenizer_dir.glob("*-merges.txt"))),
+            max_seq_length=max_seq_length,
+            vocab_file=path_to_str(next(tokenizer_dir.glob("*-vocab.json"))),
+            merges_file=path_to_str(next(tokenizer_dir.glob("*-merges.txt"))),
         )
 
     def __init__(
         self,
+        max_seq_length: int,
         vocab_file: Optional[str] = None,
         merges_file: Optional[str] = None,
         unk_token: str = "<unk>",
@@ -38,6 +40,7 @@ class CalbertTokenizer(BaseTokenizer):
         add_prefix_space: bool = True,
         dropout: Optional[float] = None,
     ):
+        self.max_seq_length = max_seq_length
         if vocab_file is not None and merges_file is not None:
             tokenizer = Tokenizer(
                 BPE.from_files(
@@ -54,6 +57,8 @@ class CalbertTokenizer(BaseTokenizer):
         tokenizer.decoder = decoders.Metaspace.new(
             replacement=replacement, add_prefix_space=add_prefix_space
         )
+        print(max_seq_length, type(max_seq_length))
+        tokenizer.enable_truncation(max_length=max_seq_length)
         tokenizer.post_processor = BertProcessing.new(("[SEP]", 3), ("[CLS]", 4))
 
         parameters = {
@@ -101,11 +106,9 @@ class CalbertTokenizer(BaseTokenizer):
     def mask_token_id(self):
         return self.token_to_id("[MASK]")
 
-    def process(self, sequence: str, pair: Optional[str] = None, max_seq_len: int = 0):
+    def process(self, sequence: str, pair: Optional[str] = None):
         enc = self.encode(sequence, pair)
-        if max_seq_len > 0:
-            enc.pad(max_seq_len, pad_token="<pad>", pad_id=self.pad_token_id)
-            enc.truncate(max_seq_len)
+        enc.pad(self.max_seq_length, pad_token="<pad>", pad_id=self.pad_token_id)
         return enc
 
 
@@ -121,7 +124,7 @@ def train(args, cfg) -> Tokenizer:
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    tokenizer = CalbertTokenizer()
+    tokenizer = CalbertTokenizer(max_seq_length=cfg.training.max_seq_length)
 
     tokenizer.train(
         [path_to_str(args.input_file)],

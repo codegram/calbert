@@ -83,7 +83,7 @@ def _process_file(
         shape=(num_lines, max_seq_length),
     )
     for idx, line in enumerate(input_text):
-        e = tokenizer.process(line.strip(), max_seq_len=max_seq_length)
+        e = tokenizer.process(line.strip())
         ids_np[idx, :] = np.array(e.ids, dtype=ids_type)
         special_tokens_mask_np[idx, :] = np.array(
             e.special_tokens_mask, dtype=special_tokens_mask_type
@@ -107,7 +107,9 @@ def _process_file(
 def process(args, cfg):
     log.info(f"Creating dataset: {args}")
 
-    tokenizer = CalbertTokenizer.from_dir(args.tokenizer_dir)
+    tokenizer = CalbertTokenizer.from_dir(
+        args.tokenizer_dir, cfg.training.max_seq_length
+    )
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
