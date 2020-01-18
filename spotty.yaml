@@ -1,0 +1,29 @@
+project:
+  name: calbert
+  syncFilters:
+    - exclude:
+      - .venv
+      - .venv/*
+      - .git/*
+      - .idea/*
+      - '*/__pycache__/*'
+
+container:
+  projectDir: /workspace/project
+  image: pytorch/pytorch:latest
+  ports: [6006, 8888]
+  volumeMounts:
+    - name: workspace
+      mountPath: /workspace
+
+instances:
+  - name: i1
+    provider: gcp
+    parameters:
+      zone: europe-west4-a
+      onDemandInstance: true
+      machineType: n1-standard-1
+      gpu:
+        type: nvidia-tesla-p100
+        count: 1
+
