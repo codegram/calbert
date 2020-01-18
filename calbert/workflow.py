@@ -120,6 +120,7 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
         ),
         tensorboard_directory="tensorboard",
         commit_label="repo",
+        docker_image="codegram/apex-pytorch1.4-cuda10.1:latest",
         machine_type="v100",
         pip_packages=packages,
         attached_resources={tokenizer_path: "tokenizer", dataset_path: "dataset"},
