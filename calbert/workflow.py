@@ -100,7 +100,9 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
     r = client.runs.new(
         command=" ".join(
             [
-                "git clone https://www.github.com/nvidia/apex && cd apex && pip install -v --no-cache-dir --global-option='--cpp_ext' --global-option='--cuda_ext' ./ && cd .. && rm -fr apex &&",
+                "git clone https://www.github.com/nvidia/apex &&",
+                "cd apex && pip install -v --no-cache-dir --global-option='--cpp_ext' --global-option='--cuda_ext' ./ && ",
+                "cd .. && rm -fr apex &&",
                 "python",
                 "-m calbert",
                 "train_model",
