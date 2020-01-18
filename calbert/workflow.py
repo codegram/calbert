@@ -101,7 +101,7 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
         command=" ".join(
             [
                 "git clone https://www.github.com/nvidia/apex &&",
-                "cd apex && pip install -v --no-cache-dir --global-option='--cpp_ext' --global-option='--cuda_ext' ./ && ",
+                """cd apex && pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./ && """,
                 "cd .. && rm -fr apex &&",
                 "python",
                 "-m calbert",
@@ -152,7 +152,9 @@ def run(args, cfg):
     )
     wait(client, tokenizer_run)
 
-    dataset_run, dataset_path = create_dataset(client, cfg, data_path, tokenizer_path, forced_run_id=315)
+    dataset_run, dataset_path = create_dataset(
+        client, cfg, data_path, tokenizer_path, forced_run_id=315
+    )
     wait(client, dataset_run)
 
     model_run, model_path = train_model(client, cfg, tokenizer_path, dataset_path)
