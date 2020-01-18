@@ -209,7 +209,7 @@ def mask_tokens(
     labels[
         ~masked_indices
     ] = (
-        -100
+        -1
     )  # We only compute loss on masked tokens TODO: change to -100 once the change is merged in tranformers
 
     # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])

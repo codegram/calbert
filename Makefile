@@ -5,6 +5,9 @@ deps: Pipfile
 	pipenv install --dev
 	pipenv lock -r > requirements.txt
 
+deps-reset:
+	pipenv --rm
+
 test:
 	pipenv run py.test
 
@@ -14,4 +17,4 @@ lint:
 clean:
 	rm -fr run train.txt valid.txt tokenizer dataset calbert/__pycache__
 
-.PHONY: test cast lint clean
+.PHONY: test cast lint clean deps-reset
