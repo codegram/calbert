@@ -61,7 +61,7 @@ def create_tokenizer(client, cfg, data_path, forced_run_id=None):
         return (None, f"runs/{forced_run_id}/tokenizer")
 
     r = client.runs.new(
-        command="mkdir -p /spell/tokenizer && python calbert.py train_tokenizer --input-file /spell/train.txt --out-dir /spell/tokenizer",
+        command="mkdir -p /spell/tokenizer && python -m calbert train_tokenizer --input-file /spell/train.txt --out-dir /spell/tokenizer",
         commit_label="repo",
         machine_type="cpu-big",
         pip_packages=packages,
@@ -80,7 +80,7 @@ def create_dataset(client, cfg, data_path, tokenizer_path, forced_run_id=None):
         return (None, f"runs/{forced_run_id}/dataset")
 
     r = client.runs.new(
-        command="mkdir -p $PWD/dataset && python calbert.py dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset",
+        command="mkdir -p $PWD/dataset && python -m calbert dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset",
         commit_label="repo",
         machine_type="cpu-big",
         pip_packages=packages,
@@ -103,7 +103,7 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
             [
                 "git clone https://www.github.com/nvidia/apex && cd apex && pip install -v --no-cache-dir --global-option='--cpp_ext' --global-option='--cuda_ext' ./ && cd .. && rm -fr apex &&",
                 "python",
-                "calbert.py",
+                "-m calbert",
                 "train_model",
                 "--tokenizer-dir",
                 "$PWD/tokenizer",
