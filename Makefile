@@ -8,6 +8,13 @@ deps: Pipfile
 deps-reset:
 	pipenv --rm
 
+docker:
+	cp requirements.txt docker
+	docker build -t codegram/calbert ./docker
+
+docker-push:
+	docker push codegram/calbert:latest
+
 test:
 	pipenv run py.test
 
@@ -17,4 +24,4 @@ lint:
 clean:
 	rm -fr run train.txt valid.txt tokenizer dataset calbert/__pycache__
 
-.PHONY: test cast lint clean deps-reset
+.PHONY: test cast lint clean deps-reset docker docker-push

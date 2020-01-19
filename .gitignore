@@ -9,5 +9,6 @@ run/
 runs/
 *.txt
 tokenizer/
+docker/requirements.txt
 wandb/
 *.pkl
