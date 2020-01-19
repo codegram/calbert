@@ -12,7 +12,7 @@ from typing import Tuple
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler, SubsetRandomSampler
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
 import wandb
@@ -81,6 +81,13 @@ def arguments() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--subset",
+        default=1.0,
+        type=float,
+        help="Percentage of dataset to use",
+    )
+
+    parser.add_argument(
         "--no_cuda", default=False, help="Avoid using CUDA when available"
     )
 
@@ -92,18 +99,18 @@ def arguments() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fp16_opt_level",
         type=str,
-        default="O1",
+        default="O3",
         help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
         "See details at https://nvidia.github.io/apex/amp.html",
     )
 
     parser.add_argument(
-        "--logging_steps", type=int, default=200, help="Log every X updates steps."
+        "--logging_steps", type=int, default=5, help="Log every X updates steps."
     )
     parser.add_argument(
         "--save_steps",
         type=int,
-        default=200,
+        default=20,
         help="Save checkpoint every X updates steps.",
     )
     parser.add_argument(
@@ -158,7 +165,7 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     model.eval()
 
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
-        inputs, special_tokens_masks, attention_masks, token_type_ids = batch
+        inputs, special_tokens_masks, attention_masks, token_type_ids = batch.permute(1, 0, 2)
         inputs, labels = mask_tokens(inputs, special_tokens_masks, tokenizer, cfg)
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -281,6 +288,10 @@ def _train(args, cfg, dataset, model, tokenizer, device):
     train_sampler = (
         RandomSampler(dataset) if args.local_rank == -1 else DistributedSampler(dataset)
     )
+    if args.subset != 1.0 and args.local_rank == -1:
+        last_idx = int((len(dataset) - 1) * args.subset)
+        train_sampler = SubsetRandomSampler(range(0, last_idx))
+
     train_dataloader = DataLoader(
         dataset, sampler=train_sampler, batch_size=train_batch_size
     )

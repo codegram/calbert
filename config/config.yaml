@@ -15,15 +15,12 @@ seed: 42
 training:
   machine_type: v100
 
-  max_seq_length: 256 # 512
+  max_seq_length: 128 # 512
 
-  max_predictions_per_seq: 20
   masked_lm_prob: 0.10
-  whole_word_masking: True
   num_train_steps: 100 #1000 # 125000
   num_warmup_steps: 5 # 100 # 3125
   epochs: 1 # used only if num_train_steps <= 0, otherwise autocalculated
-  save_checkpoints_steps: 20
 
   weight_decay: 0.0
   learning_rate: 5e-5

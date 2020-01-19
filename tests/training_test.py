@@ -36,6 +36,7 @@ def training_args_cfg():
                             )
                             dataset_config = [
                                 "training.max_seq_length=12",
+                                "data.processing_minibatch_size=2",
                                 "vocab.max_size=10",
                             ]
                             dataset_cfg = OmegaConf.from_dotlist(dataset_config)
@@ -58,6 +59,8 @@ def training_args_cfg():
                                     "2",
                                     "--per_gpu_eval_batch_size",
                                     "2",
+                                    "--subset",
+                                    "0.8"
                                 ]
                             )
 
