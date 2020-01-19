@@ -100,9 +100,10 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
     r = client.runs.new(
         command=" ".join(
             [
-                "git clone https://www.github.com/nvidia/apex &&",
-                """cd apex && pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./ && """,
-                "cd .. && rm -fr apex &&",
+                # "git clone https://www.github.com/nvidia/apex &&",
+                # """cd apex && pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./ && """,
+                # "cd .. && rm -fr apex &&",
+                "pip install -r requirements.txt && ",
                 "python",
                 "-m calbert",
                 "train_model",
@@ -121,8 +122,8 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
         tensorboard_directory="tensorboard",
         commit_label="repo",
         docker_image="codegram/apex-pytorch1.4-cuda10.1:latest",
-        machine_type="v100",
-        pip_packages=packages,
+        machine_type=cfg.training.machine_type,
+        # pip_packages=packages,
         attached_resources={tokenizer_path: "tokenizer", dataset_path: "dataset"},
         # idempotent=True,
     )

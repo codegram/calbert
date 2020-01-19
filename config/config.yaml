@@ -13,6 +13,8 @@ vocab:
 seed: 42
 
 training:
+  machine_type: p100
+
   max_seq_length: 128 # 512
 
   max_predictions_per_seq: 20
