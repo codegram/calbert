@@ -361,7 +361,8 @@ def _train(args, cfg, dataset, model, tokenizer, device):
 
     if args.wandb:
         wandb.config.train_batch_size = train_batch_size
-    wandb.watch(model, log='all')
+        wandb.config.subset = args.subset
+    # wandb.watch(model, log='all')
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
