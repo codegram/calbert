@@ -105,12 +105,12 @@ def arguments() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--logging_steps", type=int, default=5, help="Log every X updates steps."
+        "--logging_steps", type=int, default=200, help="Log every X updates steps."
     )
     parser.add_argument(
         "--save_steps",
         type=int,
-        default=20,
+        default=500,
         help="Save checkpoint every X updates steps.",
     )
     parser.add_argument(
@@ -282,8 +282,9 @@ def _rotate_checkpoints(args, checkpoint_prefix, use_mtime=False):
 
 def _train(args, cfg, dataset, model, tokenizer, device):
     """ Train the model """
-    if args.local_rank in [-1, 0]:
-        tb_writer = SummaryWriter(args.tensorboard_dir)
+    tb_writer = SummaryWriter(args.tensorboard_dir)
+    #if args.local_rank in [-1, 0]:
+    #    tb_writer = SummaryWriter(args.tensorboard_dir)
 
     train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = (
@@ -360,9 +361,10 @@ def _train(args, cfg, dataset, model, tokenizer, device):
             model, optimizer, opt_level=args.fp16_opt_level
         )
 
-    if args.wandb:
+    if args.wandb and args.local_rank in [-1, 0]:
         wandb.config.train_batch_size = train_batch_size
         wandb.config.subset = args.subset
+        wandb.config.gpus = torch.cuda.device_count()
     # wandb.watch(model, log='all')
 
     # multi-gpu training (should be after apex fp16 initialization)
@@ -574,8 +576,8 @@ def set_seed(args, cfg):
 
 
 def train(args, cfg):
-    if args.wandb:
-        wandb.init(project="calbert", group='main', sync_tensorboard=True)
+    if args.wandb and args.local_rank in [-1, 0]:
+        wandb.init(project="calbert", sync_tensorboard=True)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -616,13 +618,13 @@ def train(args, cfg):
         merges_file=path_to_str(next(args.tokenizer_dir.glob("*-merges.txt"))),
     )
 
-    if args.wandb:
+    if args.wandb and args.local_rank in [-1, 0]:
         c = dict(cfg.training)
         for k in c.keys():
             wandb.config[k] = c[k]
 
     c = dict(cfg.model)
-    if args.wandb:
+    if args.wandb and args.local_rank in [-1, 0]:
         for k in c.keys():
             wandb.config[k] = c[k]
 

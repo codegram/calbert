@@ -18,8 +18,8 @@ training:
   max_seq_length: 128 # 512
 
   masked_lm_prob: 0.10
-  num_train_steps: 100 #1000 # 125000
-  num_warmup_steps: 5 # 100 # 3125
+  num_train_steps: 12500 #1000 # 125000
+  num_warmup_steps: 312 # 100 # 3125
   epochs: 1 # used only if num_train_steps <= 0, otherwise autocalculated
 
   weight_decay: 0.0
