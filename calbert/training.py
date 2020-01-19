@@ -157,9 +157,10 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
         model = torch.nn.DataParallel(model)
 
     # Eval!
-    log.info("***** Running evaluation {} *****".format(prefix))
-    log.info("  Num examples = %d", len(valid_dataset))
-    log.info("  Batch size = %d", args.eval_batch_size)
+    if args.local_rank in [-1, 0]:
+        log.info("***** Running evaluation {} *****".format(prefix))
+        log.info("  Num examples = %d", len(valid_dataset))
+        log.info("  Batch size = %d", args.eval_batch_size)
     eval_loss = 0.0
     nb_eval_steps = 0
     model.eval()
@@ -574,7 +575,7 @@ def set_seed(args, cfg):
 
 def train(args, cfg):
     if args.wandb:
-        wandb.init(project="calbert", sync_tensorboard=True)
+        wandb.init(project="calbert", group='main', sync_tensorboard=True)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -599,18 +600,15 @@ def train(args, cfg):
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN,
     )
-    log.info(f"Pretraining ALBERT: {args}")
-    log.warning(
-        "Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
-        args.local_rank,
-        device,
-        args.n_gpu,
-        bool(args.local_rank != -1),
-        args.fp16,
-    )
-
-    if args.local_rank not in [-1, 0]:
-        torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
+    if args.local_rank in [-1, 0]:
+        log.info(f"Pretraining ALBERT: {args}")
+        log.warning(
+            "Device: %s, gpus: %s, distributed training: %s, 16-bits training: %s",
+            device,
+            torch.cuda.device_count(),
+            bool(args.local_rank != -1),
+            args.fp16,
+        )
 
     tokenizer = CalbertTokenizer(
         max_seq_length=cfg.training.max_seq_length,
@@ -645,13 +643,16 @@ def train(args, cfg):
 
     train_dataset = CalbertDataset(dataset_dir=args.dataset_dir, split='train', max_seq_length=cfg.training.max_seq_length, max_vocab_size=cfg.vocab.max_size, subset=args.subset)
 
-    log.info("Loaded %i examples", len(train_dataset))
+    if args.local_rank in [-1, 0]:
+        log.info("Loaded %i examples", len(train_dataset))
 
-    if args.local_rank == 0:
-        torch.distributed.barrier()
+    #if args.local_rank == 0:
+    #    torch.distributed.barrier()
 
     global_step, tr_loss = _train(args, cfg, train_dataset, model, tokenizer, device)
-    log.info(" global_step = %s, average loss = %s", global_step, tr_loss)
+
+    if args.local_rank in [-1, 0]:
+        log.info(" global_step = %s, average loss = %s", global_step, tr_loss)
 
     # Saving best-practices: if you use save_pretrained for the model and tokenizer, you can reload them using from_pretrained()
     if args.local_rank == -1 or torch.distributed.get_rank() == 0:
