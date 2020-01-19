@@ -11,7 +11,6 @@ pytest-concurrent = "*"
 pytest-testdox = "*"
 flake8 = "*"
 rope = "*"
-spotty = {editable = true,ref = 'dev',git = "git://github.com/apls777/spotty"}
 black = "*"
 
 [packages]

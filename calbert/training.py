@@ -282,9 +282,8 @@ def _rotate_checkpoints(args, checkpoint_prefix, use_mtime=False):
 
 def _train(args, cfg, dataset, model, tokenizer, device):
     """ Train the model """
-    tb_writer = SummaryWriter(args.tensorboard_dir)
-    #if args.local_rank in [-1, 0]:
-    #    tb_writer = SummaryWriter(args.tensorboard_dir)
+    if args.local_rank in [-1, 0]:
+        tb_writer = SummaryWriter(args.tensorboard_dir)
 
     train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = (
@@ -496,7 +495,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                 ):
                     # Log metrics
                     if (
-                        args.local_rank == -1
+                        args.local_rank in [-1, 0]
                     ):  # Only evaluate when single GPU otherwise metrics may not average well
                         results = evaluate(args, cfg, model, tokenizer, device)
                         for key, value in results.items():
@@ -648,7 +647,7 @@ def train(args, cfg):
     if args.local_rank in [-1, 0]:
         log.info("Loaded %i examples", len(train_dataset))
 
-    #if args.local_rank == 0:
+    # if args.local_rank == 0:
     #    torch.distributed.barrier()
 
     global_step, tr_loss = _train(args, cfg, train_dataset, model, tokenizer, device)
