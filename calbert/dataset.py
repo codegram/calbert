@@ -177,7 +177,12 @@ def dataset_type(element, max_vocab_size):
 
 class CalbertDataset(Dataset):
     def __init__(
-        self, dataset_dir: Path, split: str, max_seq_length: int, max_vocab_size: int
+        self,
+        dataset_dir: Path,
+        split: str,
+        max_seq_length: int,
+        max_vocab_size: int,
+        subset: int = 1.0,
     ):
         super(CalbertDataset, self).__init__()
 
@@ -195,6 +200,8 @@ class CalbertDataset(Dataset):
             .read()
             .strip()
         )
+
+        self.effective_length = max(1, int(self.length * subset))
 
         self.ids = np.memmap(
             dataset_element(dataset_dir, split, max_seq_length, max_vocab_size, "ids"),
@@ -244,4 +251,4 @@ class CalbertDataset(Dataset):
         ).long()
 
     def __len__(self):
-        return self.length
+        return self.effective_length

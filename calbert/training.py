@@ -12,7 +12,7 @@ from typing import Tuple
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler, SubsetRandomSampler
+from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
 import wandb
@@ -140,7 +140,7 @@ def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_output_dir = path_to_str(args.out_dir)
 
-    valid_dataset = CalbertDataset(dataset_dir=args.dataset_dir, split='valid', max_seq_length=cfg.training.max_seq_length, max_vocab_size=cfg.vocab.max_size)
+    valid_dataset = CalbertDataset(dataset_dir=args.dataset_dir, split='valid', max_seq_length=cfg.training.max_seq_length, max_vocab_size=cfg.vocab.max_size, subset=args.subset)
 
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(eval_output_dir)
@@ -288,9 +288,6 @@ def _train(args, cfg, dataset, model, tokenizer, device):
     train_sampler = (
         RandomSampler(dataset) if args.local_rank == -1 else DistributedSampler(dataset)
     )
-    if args.subset != 1.0 and args.local_rank == -1:
-        last_idx = int((len(dataset) - 1) * args.subset)
-        train_sampler = SubsetRandomSampler(range(0, last_idx))
 
     train_dataloader = DataLoader(
         dataset, sampler=train_sampler, batch_size=train_batch_size
@@ -364,7 +361,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
 
     if args.wandb:
         wandb.config.train_batch_size = train_batch_size
-    # wandb.watch(model, log='all')
+    wandb.watch(model, log='all')
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
@@ -645,7 +642,7 @@ def train(args, cfg):
 
     model = model.to(device)
 
-    train_dataset = CalbertDataset(dataset_dir=args.dataset_dir, split='train', max_seq_length=cfg.training.max_seq_length, max_vocab_size=cfg.vocab.max_size)
+    train_dataset = CalbertDataset(dataset_dir=args.dataset_dir, split='train', max_seq_length=cfg.training.max_seq_length, max_vocab_size=cfg.vocab.max_size, subset=args.subset)
 
     log.info("Loaded %i examples", len(train_dataset))
 

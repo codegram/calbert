@@ -79,3 +79,25 @@ class TestDataset:
             "<pad>",
             "<pad>",
         ]
+
+    @pytest.mark.it("Loads only a subset of the data, with a minimum of 1 row")
+    def test_subset(self, dataset_args_cfg):
+        args, cfg, tokenizer = dataset_args_cfg
+        outdir = args.out_dir
+        dataset.process(args, cfg)
+        train_ds = dataset.CalbertDataset(
+            outdir,
+            split="train",
+            max_seq_length=cfg.training.max_seq_length,
+            max_vocab_size=cfg.vocab.max_size,
+            subset=0.5,
+        )
+        valid_ds = dataset.CalbertDataset(
+            outdir,
+            split="valid",
+            max_seq_length=cfg.training.max_seq_length,
+            max_vocab_size=cfg.vocab.max_size,
+            subset=0.5,
+        )
+        assert len(train_ds) == 2
+        assert len(valid_ds) == 1

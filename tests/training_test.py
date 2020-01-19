@@ -1,5 +1,6 @@
 import logging
 import pytest
+import re
 import tempfile
 import glob
 import argparse
@@ -59,15 +60,17 @@ def training_args_cfg():
                                     "2",
                                     "--per_gpu_eval_batch_size",
                                     "2",
+                                    "--logging_steps",
+                                    "1",
                                     "--subset",
-                                    "0.8"
+                                    "1.0",
                                 ]
                             )
 
                             training_config = [
                                 "training.max_seq_length=12",
                                 "training.masked_lm_prob=0.1",
-                                "training.num_train_steps=1",
+                                "training.num_train_steps=2",
                                 "training.num_warmup_steps=0",
                                 "training.epochs=1",
                                 "training.weight_decay=0.0",
@@ -108,6 +111,11 @@ class TestTraining:
         )
 
         batch_inputs = masked_token_ids.unsqueeze(0)
+
+        results = open(model_path + "/eval_results.txt").read()
+        perplexity = int(re.match(r"perplexity = tensor\(([0-9]+)", results)[1])
+
+        assert perplexity < 50
 
         predictions = model(batch_inputs, token_type_ids=type_ids.unsqueeze(0))[0][0]
 
