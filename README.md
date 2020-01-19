@@ -94,6 +94,14 @@ Warning, this is really slow! You probably want to run the full thing on GPUs. [
 make workflow
 ```
 
+### Distributed training
+
+Adjust how many GPUs you have and make sure to tune your batch size in `launch.py`.
+
+```bash
+python -m torch.distributed.launch --nproc_per_node=NUM_GPUS launch.py
+```
+
 ### Running tests
 
 ```bash

@@ -108,6 +108,9 @@ def arguments() -> argparse.ArgumentParser:
         "--logging_steps", type=int, default=200, help="Log every X updates steps."
     )
     parser.add_argument(
+        "--eval_steps", type=int, default=24000, help="Evaluate every X steps."
+    )
+    parser.add_argument(
         "--save_steps",
         type=int,
         default=500,
@@ -496,6 +499,8 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                     # Log metrics
                     if (
                         args.local_rank in [-1, 0]
+                        and args.eval_steps > 0
+                        and global_step % args.eval_teps == 0
                     ):  # Only evaluate when single GPU otherwise metrics may not average well
                         results = evaluate(args, cfg, model, tokenizer, device)
                         for key, value in results.items():
