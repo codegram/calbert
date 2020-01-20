@@ -26,7 +26,7 @@ from transformers import (
 
 from .tokenizer import CalbertTokenizer
 from .dataset import CalbertDataset
-from .utils import path_to_str
+from .utils import normalize_path
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -141,7 +141,7 @@ def arguments() -> argparse.ArgumentParser:
 
 def evaluate(args, cfg, model, tokenizer, device, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
-    eval_output_dir = path_to_str(args.out_dir)
+    eval_output_dir = str(args.out_dir)
 
     valid_dataset = CalbertDataset(dataset_dir=args.dataset_dir, split='valid', max_seq_length=cfg.training.max_seq_length, max_vocab_size=cfg.vocab.max_size, subset=args.subset)
 
@@ -252,7 +252,7 @@ def _rotate_checkpoints(args, checkpoint_prefix, use_mtime=False):
 
     # Check if we should delete older checkpoint(s)
     glob_checkpoints = glob.glob(
-        os.path.join(path_to_str(args.out_dir), "{}-*".format(checkpoint_prefix))
+        os.path.join(str(args.out_dir), "{}-*".format(checkpoint_prefix))
     )
     if len(glob_checkpoints) <= args.save_total_limit:
         return
@@ -341,15 +341,15 @@ def _train(args, cfg, dataset, model, tokenizer, device):
     )
 
     # Check if saved optimizer or scheduler states exist
-    if os.path.isfile(os.path.join(path_to_str(args.out_dir), "optimizer.pt")) and os.path.isfile(
-        os.path.join(path_to_str(args.out_dir), "scheduler.pt")
+    if os.path.isfile(os.path.join(str(args.out_dir), "optimizer.pt")) and os.path.isfile(
+        os.path.join(str(args.out_dir), "scheduler.pt")
     ):
         # Load in optimizer and scheduler states
         optimizer.load_state_dict(
-            torch.load(os.path.join(path_to_str(args.out_dir), "optimizer.pt"))
+            torch.load(os.path.join(str(args.out_dir), "optimizer.pt"))
         )
         scheduler.load_state_dict(
-            torch.load(os.path.join(path_to_str(args.out_dir), "scheduler.pt"))
+            torch.load(os.path.join(str(args.out_dir), "scheduler.pt"))
         )
 
     if args.fp16:
@@ -401,7 +401,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
     steps_trained_in_current_epoch = 0
 
     # Check if continuing training from a checkpoint
-    if os.path.exists(path_to_str(args.out_dir) + "/" + args.model_name):
+    if os.path.exists(str(args.out_dir) + "/" + args.model_name):
         try:
             # set global_step to gobal_step of last saved checkpoint from model path
             checkpoint_suffix = args.model_name.split("-")[-1].split("/")[0]
@@ -529,7 +529,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                     checkpoint_prefix = "checkpoint"
                     # Save model checkpoint
                     output_dir = os.path.join(
-                        path_to_str(args.out_dir), "{}-{}".format(checkpoint_prefix, global_step)
+                        str(args.out_dir), "{}-{}".format(checkpoint_prefix, global_step)
                     )
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
@@ -583,6 +583,11 @@ def train(args, cfg):
     if args.wandb and args.local_rank in [-1, 0]:
         wandb.init(project="calbert", sync_tensorboard=True)
 
+    args.tokenizer_dir = normalize_path(args.tokenizer_dir)
+    args.dataset_dir = normalize_path(args.dataset_dir)
+    args.tensorboard_dir = normalize_path(args.tensorboard_dir)
+    args.out_dir = normalize_path(args.out_dir)
+
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     args.model_name = (
@@ -616,11 +621,7 @@ def train(args, cfg):
             args.fp16,
         )
 
-    tokenizer = CalbertTokenizer(
-        max_seq_length=cfg.training.max_seq_length,
-        vocab_file=path_to_str(next(args.tokenizer_dir.glob("*-vocab.json"))),
-        merges_file=path_to_str(next(args.tokenizer_dir.glob("*-merges.txt"))),
-    )
+    tokenizer = CalbertTokenizer.from_dir(args.tokenizer_dir, max_seq_length=cfg.training.max_seq_length)
 
     if args.wandb and args.local_rank in [-1, 0]:
         c = dict(cfg.training)
@@ -663,22 +664,22 @@ def train(args, cfg):
     # Saving best-practices: if you use save_pretrained for the model and tokenizer, you can reload them using from_pretrained()
     if args.local_rank == -1 or torch.distributed.get_rank() == 0:
         # Create output directory if needed
-        if not os.path.exists(path_to_str(args.out_dir)) and args.local_rank in [-1, 0]:
-            os.makedirs(path_to_str(args.out_dir))
+        if not os.path.exists(str(args.out_dir)) and args.local_rank in [-1, 0]:
+            os.makedirs(str(args.out_dir))
 
-        log.info("Saving model checkpoint to %s", path_to_str(args.out_dir))
+        log.info("Saving model checkpoint to %s", str(args.out_dir))
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         model_to_save = (
             model.module if hasattr(model, "module") else model
         )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(path_to_str(args.out_dir))
+        model_to_save.save_pretrained(str(args.out_dir))
 
         # Good practice: save your training arguments together with the trained model
-        torch.save(args, os.path.join(path_to_str(args.out_dir), "training_args.bin"))
+        torch.save(args, os.path.join(str(args.out_dir), "training_args.bin"))
 
         # Load a trained model and vocabulary that you have fine-tuned
-        model = AlbertForMaskedLM.from_pretrained(path_to_str(args.out_dir))
+        model = AlbertForMaskedLM.from_pretrained(str(args.out_dir))
         model.to(device)
 
     return model

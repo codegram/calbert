@@ -48,11 +48,9 @@ Because there are no language models in Catalan! And there's a lot of Catalan te
 
 ## Training calbert from scratch
 
-In most commands, you need to provide absolute paths with `$PWD` since these are Hydra runs and they don't run on the current directory.
-
 All config lives under `config`. There you can control parameters related to training, tokenizing, and everything, and even choose which version of the model to train.
 
-All configuration is overridable, since it's [Hydra](https://cli.dev) configuration. Check their docs.
+All configuration is overridable, since it's [Hydra](https://hydra.cc) configuration. Check their docs.
 
 ### Getting the dataset
 
@@ -69,7 +67,7 @@ gunzip -c data.txt.gz | tail -n 200 > valid.txt
 We're training the tokenizer only on the training set, not the validation set.
 
 ```bash
-python -m calbert train_tokenizer --input-file $PWD/train.txt --out-dir $PWD/tokenizer
+python -m calbert train_tokenizer --input-file train.txt --out-dir tokenizer
 ```
 
 ### Producing the dataset
@@ -77,13 +75,13 @@ python -m calbert train_tokenizer --input-file $PWD/train.txt --out-dir $PWD/tok
 The dataset is basically a distillation of the raw text data into fixed-length sentences represented by a 4-tuple of tensors `(token_ids, special_tokens_mask, attention_mask, tensor_type_ids)`. Producing these tuples is computationally expensive so we have a separate step for it.
 
 ```bash
-python -m calbert dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset
+python -m calbert dataset --train-file train.txt --valid-file valid.txt --tokenizer-dir tokenizer --out-dir dataset
 ```
 
 ### Training the model
 
 ```bash
-python -m calbert train_model --tokenizer-dir $PWD/tokenizer --dataset-dir $PWD/dataset --out-dir $PWD/model --tensorboard-dir $PWD/tensorboard
+python -m calbert train_model --tokenizer-dir tokenizer --dataset-dir dataset --out-dir model --tensorboard-dir tensorboard
 ```
 
 Warning, this is really slow! You probably want to run the full thing on GPUs. [Spell](https://spell.run) is our platform of choice.

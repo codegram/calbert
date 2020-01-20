@@ -1,10 +1,11 @@
 "Random utils used here and there"
 
-__all__ = ["path_to_str"]
+__all__ = ["normalize_path"]
 
 from pathlib import Path
+from hydra.utils import to_absolute_path
 
 
-def path_to_str(p: Path) -> str:
-    "Converts a path into string, representing it as absolute if needed"
-    return str(p.absolute())
+def normalize_path(p: Path) -> Path:
+    "Converts a path into absolute gathering Hydra's original directory"
+    return Path(to_absolute_path(str(p)))

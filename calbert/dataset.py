@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm, trange
 
 from .tokenizer import CalbertTokenizer
-from .utils import path_to_str
+from .utils import normalize_path
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +79,7 @@ def _process_file(
             chunk(sentence_pairs(input_file), minibatch_size, None),
         ),
         desc="Tokenizing",
+        # total=100
     )
 
     ids_type = dataset_type("ids", max_vocab_size)
@@ -194,16 +195,21 @@ def _process_file(
 def process(args, cfg):
     log.info(f"Creating dataset: {args}")
 
+    train_file = normalize_path(args.train_file)
+    valid_file = normalize_path(args.valid_file)
+    out_dir = normalize_path(args.out_dir)
+    tokenizer_dir = normalize_path(args.tokenizer_dir)
+
     tokenizer = CalbertTokenizer.from_dir(
-        args.tokenizer_dir, cfg.training.max_seq_length
+        tokenizer_dir, cfg.training.max_seq_length
     )
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     _process_file(
         tokenizer,
-        args.train_file,
-        args.out_dir,
+        train_file,
+        out_dir,
         split="train",
         max_seq_length=cfg.training.max_seq_length,
         max_vocab_size=cfg.vocab.max_size,
@@ -211,8 +217,8 @@ def process(args, cfg):
     )
     _process_file(
         tokenizer,
-        args.valid_file,
-        args.out_dir,
+        valid_file,
+        out_dir,
         split="valid",
         max_seq_length=cfg.training.max_seq_length,
         max_vocab_size=cfg.vocab.max_size,
@@ -220,7 +226,7 @@ def process(args, cfg):
     )
 
     log.info(
-        f"Wrote dataset at {str(args.out_dir)}/train|valid.v{cfg.vocab.max_size}.sl{cfg.training.max_seq_length}.*.npy"
+        f"Wrote dataset at {str(out_dir)}/train|valid.v{cfg.vocab.max_size}.sl{cfg.training.max_seq_length}.*.npy"
     )
 
 
@@ -232,7 +238,7 @@ def dataset_element(
     element: str,
     npy=True,
 ) -> str:
-    return f"{path_to_str(dataset_dir)}/{split}.v{max_vocab_size}.sl{max_seq_length}.{element}{'.npy' if npy else ''}"
+    return f"{dataset_dir}/{split}.v{max_vocab_size}.sl{max_seq_length}.{element}{'.npy' if npy else ''}"
 
 
 def dataset_type(element, max_vocab_size):

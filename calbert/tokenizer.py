@@ -13,7 +13,7 @@ from tokenizers.implementations.base_tokenizer import BaseTokenizer
 
 from typing import Optional, List, Union
 
-from .utils import path_to_str
+from .utils import normalize_path
 
 log = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ class CalbertTokenizer(BaseTokenizer):
     def from_dir(cls, tokenizer_dir: Path, max_seq_length: int):
         return CalbertTokenizer(
             max_seq_length=max_seq_length,
-            vocab_file=path_to_str(next(tokenizer_dir.glob("*-vocab.json"))),
-            merges_file=path_to_str(next(tokenizer_dir.glob("*-merges.txt"))),
+            vocab_file=str(next(tokenizer_dir.glob("*-vocab.json"))),
+            merges_file=str(next(tokenizer_dir.glob("*-merges.txt"))),
         )
 
     def __init__(
@@ -213,18 +213,19 @@ def arguments() -> argparse.ArgumentParser:
 def train(args, cfg) -> Tokenizer:
     log.info(f"Training tokenizer: {args}")
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = normalize_path(args.out_dir)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     tokenizer = CalbertTokenizer(max_seq_length=cfg.training.max_seq_length)
 
     tokenizer.train(
-        [path_to_str(args.input_file)],
+        [str(normalize_path(args.input_file))],
         max_vocab_size=cfg.vocab.max_size,
         min_frequency=cfg.vocab.min_frequency,
     )
 
-    out_dir = path_to_str(args.out_dir)
-    tokenizer.save(out_dir, f"ca.bpe.{len(tokenizer)}")
+    tokenizer.save(str(out_dir), f"ca.bpe.{len(tokenizer)}")
 
     log.info(
         f"Saved tokenizer as {out_dir}/ca.bpe.{len(tokenizer)}[-vocab.json|-merges.txt]"
