@@ -27,3 +27,4 @@ torch==1.4.0
 tqdm==4.41.1
 transformers==2.3.0
 urllib3==1.25.7
+diskarray==0.1.9
