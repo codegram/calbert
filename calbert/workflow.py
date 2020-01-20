@@ -5,10 +5,6 @@ import logging
 
 log = logging.getLogger(__name__)
 
-reqs = open((Path(__file__) / "../../requirements.txt").resolve()).readlines()
-
-packages = [dep.strip() for dep in reqs if "==" in dep]
-
 
 def wait(client, run, logs=False):
     if run is None:
@@ -60,10 +56,10 @@ def create_tokenizer(client, cfg, data_path, forced_run_id=None):
         return (None, f"runs/{forced_run_id}/tokenizer")
 
     r = client.runs.new(
-        command="mkdir -p /spell/tokenizer && python -m calbert train_tokenizer --input-file /spell/train.txt --out-dir /spell/tokenizer",
+        command="mkdir -p data && cp train.txt data && python -m calbert train_tokenizer --input-file data/train.txt --out-dir tokenizer && rm -fr data",
         commit_label="repo",
         machine_type="cpu-big",
-        pip_packages=packages,
+        docker_image="codegram/calbert:latest",
         attached_resources={f"{data_path}/train.txt": "train.txt"},
         idempotent=True,
     )
@@ -79,10 +75,10 @@ def create_dataset(client, cfg, data_path, tokenizer_path, forced_run_id=None):
         return (None, f"runs/{forced_run_id}/dataset")
 
     r = client.runs.new(
-        command="mkdir -p $PWD/dataset && python -m calbert dataset --train-file $PWD/train.txt --valid-file $PWD/valid.txt --tokenizer-dir $PWD/tokenizer --out-dir $PWD/dataset",
+        command="mkdir -p data && cp *.txt data && python -m calbert dataset --train-file data/train.txt --valid-file data/valid.txt --tokenizer-dir tokenizer --out-dir dataset && rm -fr data",
         commit_label="repo",
         machine_type="cpu-big",
-        pip_packages=packages,
+        docker_image="codegram/calbert:latest",
         attached_resources={
             f"{data_path}/train.txt": "train.txt",
             f"{data_path}/valid.txt": "valid.txt",
@@ -100,22 +96,23 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
     r = client.runs.new(
         command=" ".join(
             [
+                "mkdir -p data && cp dataset/* data &&"
                 "python",
                 "-m calbert",
                 "train_model",
                 "--tokenizer-dir",
-                "$PWD/tokenizer",
+                "tokenizer",
                 "--dataset-dir",
-                "$PWD/dataset",
+                "data",
                 "--out-dir",
-                "$PWD/model",
-                # "--tensorboard-dir",
-                # "$PWD/tensorboard",
-                "--fp16",
+                "model",
+                "--tensorboard-dir",
+                "tensorboard",
+                # "--fp16",
                 "--wandb",
             ]
         ),
-        tensorboard_directory="tensorboard",
+        tensorboard_directory="/spell/tensorboard",
         commit_label="repo",
         docker_image="codegram/calbert:latest",
         machine_type=cfg.training.machine_type,
@@ -145,12 +142,12 @@ def run(args, cfg):
     wait(client, data_run)
 
     tokenizer_run, tokenizer_path = create_tokenizer(
-        client, cfg, data_path, forced_run_id=314
+        client, cfg, data_path  # forced_run_id=314
     )
     wait(client, tokenizer_run)
 
     dataset_run, dataset_path = create_dataset(
-        client, cfg, data_path, tokenizer_path, forced_run_id=315
+        client, cfg, data_path, tokenizer_path  # forced_run_id=315
     )
     wait(client, dataset_run)
 
