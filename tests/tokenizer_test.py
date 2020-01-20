@@ -63,7 +63,7 @@ class TestCalbertokenizer:
     def test_train(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
 
-        assert len(t) == 39
+        assert len(t) == 40
         assert t.id_to_token(0) == "<unk>"
         assert t.id_to_token(1) == "<pad>"
         assert t.id_to_token(2) == "[MASK]"
@@ -74,6 +74,7 @@ class TestCalbertokenizer:
     def test_single_sentence_encoding(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
         encoded = t.encode("hola com anem")
+        assert len(encoded.ids) == 12
         assert t.id_to_token(encoded.ids[0]) == "[CLS]"
         assert t.id_to_token(encoded.ids[-1]) == "[SEP]"
 
@@ -81,9 +82,22 @@ class TestCalbertokenizer:
     def test_sentence_pair_encoding(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
         encoded = t.encode("hola com anem", "molt be i tu")
+        assert len(encoded.ids) == 12
         assert t.id_to_token(encoded.ids[0]) == "[CLS]"
-        assert t.id_to_token(encoded.ids[15]) == "[SEP]"
+        assert t.id_to_token(encoded.ids[6]) == "[SEP]"
         assert t.id_to_token(encoded.ids[-1]) == "[SEP]"
+
+    @pytest.mark.it(
+        "Encodes pairs of sentences BERT-style with CLS and SEP padding correctly"
+    )
+    def test_sentence_pair_encoding_padding(self, input_file_and_outdir):
+        t, outdir = train_tokenizer(input_file_and_outdir)
+        encoded = t.encode("com", "deu")
+        assert len(encoded.ids) == 12
+        assert t.id_to_token(encoded.ids[0]) == "[CLS]"
+        assert t.id_to_token(encoded.ids[5]) == "[SEP]"
+        assert t.id_to_token(encoded.ids[-2]) == "[SEP]"
+        assert t.id_to_token(encoded.ids[-1]) == "<pad>"
 
     @pytest.mark.it(
         "Truncates encodings to the max sequence length, respecting special tokens"
@@ -135,15 +149,29 @@ class TestCalbertokenizer:
         assert len(first.tokens) == 12
         assert len(second.tokens) == 12
 
+        first, second = t.encode_batch(
+            ["hola, no entenc be per que aquesta frase", "seria tan llarga"]
+        )
+        assert len(first.tokens) == 12
+        assert len(second.tokens) == 12
+
+    @pytest.mark.it("Encodes a batch of sentence pairs")
+    def test_batch_encoding_pairs(self, input_file_and_outdir):
+        t, outdir = train_tokenizer(input_file_and_outdir)
+        pairs = t.encode_batch(
+            [("hola, no entenc be per que aquesta frase", "seria tan llarga")]
+        )
+        assert len(pairs[0].tokens) == 12
+
     @pytest.mark.it("Saves the tokenizer's vocab and merges")
     def test_saves_tokenizer(self, input_file_and_outdir):
-        _, outdir = train_tokenizer(input_file_and_outdir)
+        t, outdir = train_tokenizer(input_file_and_outdir)
 
         got = list(glob.glob(outdir + "/*"))
         got.sort()
         expected = [
-            outdir + "/ca.bpe.39-vocab.json",
-            outdir + "/ca.bpe.39-merges.txt",
+            outdir + f"/ca.bpe.{len(t)}-vocab.json",
+            outdir + f"/ca.bpe.{len(t)}-merges.txt",
         ]
         expected.sort()
         assert got == expected

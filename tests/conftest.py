@@ -1,13 +1,15 @@
 import tempfile
 
 training_text = [
-    "Porto posat l'esquinç al peu sense sutura marejant metges i perdius i això no es cura.",
+    # 2 sentences
+    "Porto posat l'esquinç al peu sense sutura marejant metges i perdius i això no es cura. D'altra banda tampoc he anat al metge.",
+    # a single sentence
     "La sang s’ha cuit fins a tornar-se dura i passa el temps i passa i això no es cura.",
-    "Camí de massa ampla tessitura estintolada, encara sobre la corda insegura.",
-    "Hola",
+    # 3 sentences
+    "Camí de massa ampla tessitura estintolada, encara sobre la corda insegura. Sens dubte. Per tant, res.",
 ]
 
-validation_text = ["La corda insegura s'ha cuit malament"]
+validation_text = ["La corda insegura s'ha cuit malament. L'haurem de tornar a coure."]
 
 
 class InputData:

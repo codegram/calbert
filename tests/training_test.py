@@ -62,6 +62,8 @@ def training_args_cfg():
                                     "2",
                                     "--logging_steps",
                                     "1",
+                                    "--eval_steps",
+                                    "1",
                                     "--subset",
                                     "1.0",
                                 ]
@@ -115,7 +117,7 @@ class TestTraining:
         results = open(model_path + "/eval_results.txt").read()
         perplexity = int(re.match(r"perplexity = tensor\(([0-9]+)", results)[1])
 
-        assert perplexity < 50
+        assert perplexity < 70
 
         predictions = model(batch_inputs, token_type_ids=type_ids.unsqueeze(0))[0][0]
 

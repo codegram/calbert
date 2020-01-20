@@ -3,8 +3,10 @@ import logging
 import itertools
 import pickle
 import io
+import re
 from pathlib import Path
 
+from diskarray import DiskArray
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -33,6 +35,33 @@ def chunk(iterable, n, fillvalue=None):
     yield from itertools.zip_longest(*[iter(iterable)] * n, fillvalue=fillvalue)
 
 
+punctuation = re.compile(r"[\.!\?]+")
+
+
+def sentence_pairs(filename, min_length=8):
+    with open(filename, encoding="utf-8") as f:
+        for line in f:
+            sentences = [
+                s.strip()
+                for s in punctuation.split(line)
+                if len(s) >= min_length and " " in s
+            ]
+            for a, b in itertools.zip_longest(sentences[:-1], sentences[1:]):
+                yield (a + ".", b + ".")
+
+
+def _load_memmap(
+    out_dir, split, kind, max_seq_length, max_vocab_size, dtype, count, minibatch_size
+):
+    return DiskArray(
+        dataset_element(out_dir, split, max_seq_length, max_vocab_size, kind),
+        shape=(0, max_seq_length),
+        capacity=(minibatch_size, max_seq_length),
+        growby=minibatch_size,
+        dtype=dtype,
+    )
+
+
 def _process_file(
     tokenizer: CalbertTokenizer,
     input_file: Path,
@@ -43,17 +72,110 @@ def _process_file(
     minibatch_size: int,
 ):
     assert minibatch_size > 0
-    num_lines = sum(1 for line in open(path_to_str(input_file), "r"))
-    input_text = tqdm(
+    sentence_pair_count = 0
+    pairs = tqdm(
         map(
-            lambda minibatch: filter(lambda line: line is not None, minibatch),
-            chunk(
-                open(path_to_str(input_file), encoding="utf-8"), minibatch_size, None,
-            ),
+            lambda minibatch: [pair for pair in minibatch if pair is not None],
+            chunk(sentence_pairs(input_file), minibatch_size, None),
         ),
         desc="Tokenizing",
-        total=int(num_lines / minibatch_size),
     )
+
+    ids_type = dataset_type("ids", max_vocab_size)
+    special_tokens_mask_type = dataset_type("special_tokens_mask", max_vocab_size)
+    attention_mask_type = dataset_type("attention_mask", max_vocab_size)
+    type_ids_type = dataset_type("type_ids", max_vocab_size)
+
+    ids_np = _load_memmap(
+        out_dir,
+        split,
+        "ids",
+        max_seq_length,
+        max_vocab_size,
+        ids_type,
+        sentence_pair_count,
+        minibatch_size,
+    )
+    special_tokens_mask_np = _load_memmap(
+        out_dir,
+        split,
+        "special_tokens_mask",
+        max_seq_length,
+        max_vocab_size,
+        special_tokens_mask_type,
+        sentence_pair_count,
+        minibatch_size,
+    )
+    attention_mask_np = _load_memmap(
+        out_dir,
+        split,
+        "attention_mask",
+        max_seq_length,
+        max_vocab_size,
+        attention_mask_type,
+        sentence_pair_count,
+        minibatch_size,
+    )
+    type_ids_np = _load_memmap(
+        out_dir,
+        split,
+        "type_ids",
+        max_seq_length,
+        max_vocab_size,
+        type_ids_type,
+        sentence_pair_count,
+        minibatch_size,
+    )
+
+    for minibatch_idx, minibatch in enumerate(pairs):
+        # Allocate enough disk to write them
+        this_minibatch_size = len(minibatch)
+        sentence_pair_count += this_minibatch_size
+
+        start_idx = minibatch_idx * minibatch_size
+        end_idx = start_idx + this_minibatch_size
+
+        encodings = tokenizer.encode_batch(minibatch)
+
+        ids_np.extend(np.array([e.ids for e in encodings], dtype=ids_type))
+
+        special_tokens_mask_np.extend(
+            np.array(
+                [e.special_tokens_mask for e in encodings],
+                dtype=special_tokens_mask_type,
+            )
+        )
+
+        attention_mask_np.extend(
+            np.array([e.attention_mask for e in encodings], dtype=attention_mask_type)
+        )
+
+        type_ids_np.extend(
+            np.array([e.type_ids for e in encodings], dtype=type_ids_type)
+        )
+
+        # ids_np[start_idx:end_idx, :] = np.array(
+        #     [e.ids for e in encodings], dtype=ids_type
+        # )
+        # special_tokens_mask_np[start_idx:end_idx, :] = np.array(
+        #     [e.special_tokens_mask for e in encodings], dtype=special_tokens_mask_type
+        # )
+        # attention_mask_np[start_idx:end_idx, :] = np.array(
+        #     [e.attention_mask for e in encodings], dtype=attention_mask_type
+        # )
+        # type_ids_np[start_idx:end_idx, :] = np.array(
+        #     [e.type_ids for e in encodings], dtype=type_ids_type
+        # )
+
+        # ids_np.flush()
+        # special_tokens_mask_np.flush()
+        # attention_mask_np.flush()
+        # type_ids_np.flush()
+
+    # del ids_np
+    # del special_tokens_mask_np
+    # del attention_mask_np
+    # del type_ids_np
 
     with open(
         dataset_element(
@@ -61,62 +183,7 @@ def _process_file(
         ),
         "w",
     ) as f:
-
-        f.write(str(num_lines))
-
-    ids_type = dataset_type("ids", max_vocab_size)
-    ids_np = np.memmap(
-        dataset_element(out_dir, split, max_seq_length, max_vocab_size, "ids"),
-        dtype=ids_type,
-        mode="w+",
-        shape=(num_lines, max_seq_length),
-    )
-    special_tokens_mask_type = dataset_type("special_tokens_mask", max_vocab_size)
-    special_tokens_mask_np = np.memmap(
-        dataset_element(
-            out_dir, split, max_seq_length, max_vocab_size, "special_tokens_mask"
-        ),
-        dtype=special_tokens_mask_type,
-        mode="w+",
-        shape=(num_lines, max_seq_length),
-    )
-    attention_mask_type = dataset_type("attention_mask", max_vocab_size)
-    attention_mask_np = np.memmap(
-        dataset_element(
-            out_dir, split, max_seq_length, max_vocab_size, "attention_mask"
-        ),
-        dtype=attention_mask_type,
-        mode="w+",
-        shape=(num_lines, max_seq_length),
-    )
-    type_ids_type = dataset_type("type_ids", max_vocab_size)
-    type_ids_np = np.memmap(
-        dataset_element(out_dir, split, max_seq_length, max_vocab_size, "type_ids"),
-        dtype=type_ids_type,
-        mode="w+",
-        shape=(num_lines, max_seq_length),
-    )
-    for minibatch_idx, lines in enumerate(input_text):
-        start_idx = minibatch_idx * minibatch_size
-        end_idx = start_idx + minibatch_size
-        encodings = tokenizer.encode_batch([line.strip() for line in lines])
-        ids_np[start_idx:end_idx, :] = np.array(
-            [e.ids for e in encodings], dtype=ids_type
-        )
-        special_tokens_mask_np[start_idx:end_idx, :] = np.array(
-            [e.special_tokens_mask for e in encodings], dtype=special_tokens_mask_type
-        )
-        attention_mask_np[start_idx:end_idx, :] = np.array(
-            [e.attention_mask for e in encodings], dtype=attention_mask_type
-        )
-        type_ids_np[start_idx:end_idx, :] = np.array(
-            [e.type_ids for e in encodings], dtype=type_ids_type
-        )
-
-    del ids_np
-    del special_tokens_mask_np
-    del attention_mask_np
-    del type_ids_np
+        f.write(str(sentence_pair_count))
 
     log.info(
         "Saving features into files %s/[SPLIT].v[MAXVOCABSIZE].sl[MAXSEQLEN].PART.npy",
@@ -200,6 +267,8 @@ class CalbertDataset(Dataset):
             .read()
             .strip()
         )
+
+        dataset_element(dataset_dir, split, max_seq_length, max_vocab_size, "ids"),
 
         self.effective_length = max(1, int(self.length * subset))
 

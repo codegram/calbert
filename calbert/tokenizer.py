@@ -1,5 +1,6 @@
 import logging
 import argparse
+import collections
 from pathlib import Path
 from typing import Tuple
 
@@ -15,6 +16,12 @@ from typing import Optional, List, Union
 from .utils import path_to_str
 
 log = logging.getLogger(__name__)
+
+
+CustomEncoding = collections.namedtuple(
+    "CustomEncoding",
+    ["tokens", "ids", "special_tokens_mask", "attention_mask", "type_ids"],
+)
 
 
 class CalbertTokenizer(BaseTokenizer):
@@ -71,12 +78,18 @@ class CalbertTokenizer(BaseTokenizer):
 
         super().__init__(tokenizer, parameters)
 
+        self.unk_token_id = 0
+        self.pad_token_id = 1
+        self.mask_token_id = 2
+        self.sep_token_id = 3
+        self.cls_token_id = 4
+
     def train(
         self,
         files: Union[str, List[str]],
         max_vocab_size: int = 30000,
         min_frequency: int = 2,
-        special_tokens: List[str] = ["<unk>"],
+        special_tokens: List[str] = ["<unk>", "<pad>", "[MASK]", "[SEP]", "[CLS]"],
         limit_alphabet: int = 1000,
         initial_alphabet: List[str] = [],
         show_progress: bool = True,
@@ -98,13 +111,96 @@ class CalbertTokenizer(BaseTokenizer):
     def __len__(self) -> int:
         return self._tokenizer.get_vocab_size()
 
-    @property
-    def pad_token_id(self) -> int:
-        return self.token_to_id("<pad>")
+    def _truncate(self, encoding: Encoding) -> CustomEncoding:
+        curr_len = len(encoding.tokens)
+        max_len = self.max_seq_length
 
-    @property
-    def mask_token_id(self) -> int:
-        return self.token_to_id("[MASK]")
+        pair_len = sum(encoding.type_ids) - 1
+        first_len = curr_len - pair_len - 2
+
+        longest = 0 if first_len > pair_len else 1
+
+        one_start = 1
+        one_end = first_len - 1
+
+        two_start = first_len + 1
+        two_end = curr_len - 1
+
+        trimming = "one"
+        while (one_end - one_start) + (two_end - two_start) + 3 != max_len:
+            if trimming == "one":
+                one_end -= 1
+            else:
+                two_end -= 1
+
+            if (one_end - one_start) > (two_end - two_start):
+                trimming = "one"
+            else:
+                trimming = "two"
+
+        tokens = (
+            [encoding.tokens[0]]
+            + encoding.tokens[one_start:one_end]
+            + [encoding.tokens[-1]]
+            + encoding.tokens[two_start:two_end]
+            + [encoding.tokens[-1]]
+        )
+        ids = (
+            [encoding.ids[0]]
+            + encoding.ids[one_start:one_end]
+            + [encoding.ids[-1]]
+            + encoding.ids[two_start:two_end]
+            + [encoding.ids[-1]]
+        )
+        special_tokens_mask = (
+            [encoding.special_tokens_mask[0]]
+            + encoding.special_tokens_mask[one_start:one_end]
+            + [encoding.special_tokens_mask[-1]]
+            + encoding.special_tokens_mask[two_start:two_end]
+            + [encoding.special_tokens_mask[-1]]
+        )
+        attention_mask = (
+            [encoding.attention_mask[0]]
+            + encoding.attention_mask[one_start:one_end]
+            + [encoding.attention_mask[-1]]
+            + encoding.attention_mask[two_start:two_end]
+            + [encoding.attention_mask[-1]]
+        )
+        type_ids = (
+            [encoding.type_ids[0]]
+            + encoding.type_ids[one_start:one_end]
+            + [encoding.type_ids[-1]]
+            + encoding.type_ids[two_start:two_end]
+            + [encoding.type_ids[-1]]
+        )
+
+        return CustomEncoding(
+            tokens=tokens,
+            ids=ids,
+            special_tokens_mask=special_tokens_mask,
+            attention_mask=attention_mask,
+            type_ids=type_ids,
+        )
+
+    def encode(
+        self, sentence: str, pair: Optional[str] = None
+    ) -> Union[CustomEncoding, Encoding]:
+        encoding = super().encode(sentence, pair)
+        if pair is None or len(encoding.tokens) == self.max_seq_length:
+            return encoding
+        else:
+            return self._truncate(encoding)
+
+    def encode_batch(
+        self, sentences: Union[List[str], List[Tuple[str, str]]]
+    ) -> List[Union[Encoding, CustomEncoding]]:
+        out = []
+        for encoding in super().encode_batch(sentences):
+            if len(encoding.tokens) == self.max_seq_length:
+                out.append(encoding)
+            else:
+                out.append(self._truncate(encoding))
+        return out
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -125,7 +221,6 @@ def train(args, cfg) -> Tokenizer:
         [path_to_str(args.input_file)],
         max_vocab_size=cfg.vocab.max_size,
         min_frequency=cfg.vocab.min_frequency,
-        special_tokens=["<unk>", "<pad>", "[MASK]", "[SEP]", "[CLS]"],
     )
 
     out_dir = path_to_str(args.out_dir)

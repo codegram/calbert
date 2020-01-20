@@ -35,7 +35,7 @@ def dataset_args_cfg():
                     config = [
                         "training.max_seq_length=12",
                         "data.processing_minibatch_size=2",
-                        "vocab.max_size=10",
+                        "vocab.max_size=50",
                     ]
                     cfg = OmegaConf.from_dotlist(config)
                     yield args, cfg, tokenizer
@@ -60,24 +60,15 @@ class TestDataset:
             max_seq_length=cfg.training.max_seq_length,
             max_vocab_size=cfg.vocab.max_size,
         )
-        assert len(train_ds) == 4
+        assert len(train_ds) == 3
         assert len(valid_ds) == 1
 
-        tensor = train_ds[3]
+        tensor = train_ds[0]
         assert tensor.shape == (4, 12)
-        assert [tokenizer.id_to_token(x) for x in tensor[0].tolist()] == [
-            "[CLS]",
-            "▁",
-            "H",
-            "o",
-            "l",
-            "a",
-            "[SEP]",
-            "<pad>",
-            "<pad>",
-            "<pad>",
-            "<pad>",
-            "<pad>",
+        assert [tokenizer.decode(example[0].tolist()) for example in train_ds] == [
+            "[CLS] Port[SEP] D'a[SEP]",
+            "[CLS] Camí[SEP] Sen[SEP]",
+            "[CLS] Sens[SEP] Per[SEP]",
         ]
 
     @pytest.mark.it("Loads only a subset of the data, with a minimum of 1 row")
@@ -99,5 +90,5 @@ class TestDataset:
             max_vocab_size=cfg.vocab.max_size,
             subset=0.5,
         )
-        assert len(train_ds) == 2
+        assert len(train_ds) == 1
         assert len(valid_ds) == 1
