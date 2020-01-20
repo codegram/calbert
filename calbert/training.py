@@ -500,7 +500,7 @@ def _train(args, cfg, dataset, model, tokenizer, device):
                     if (
                         args.local_rank in [-1, 0]
                         and args.eval_steps > 0
-                        and global_step % args.eval_teps == 0
+                        and global_step % args.eval_steps == 0
                     ):  # Only evaluate when single GPU otherwise metrics may not average well
                         results = evaluate(args, cfg, model, tokenizer, device)
                         for key, value in results.items():
