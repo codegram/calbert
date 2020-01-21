@@ -79,7 +79,7 @@ def _process_file(
             chunk(sentence_pairs(input_file), minibatch_size, None),
         ),
         desc="Tokenizing",
-        # total=100
+        total=int(19557475 / minibatch_size)
     )
 
     ids_type = dataset_type("ids", max_vocab_size)

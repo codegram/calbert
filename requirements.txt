@@ -22,7 +22,7 @@ sacremoses==0.0.38
 sentencepiece==0.1.85
 six==1.14.0
 tensorboardx==2.0
-tokenizers==0.1.1
+tokenizers==0.2.0
 torch==1.4.0
 tqdm==4.41.1
 transformers==2.3.0

@@ -18,7 +18,7 @@ hydra-core = "*"
 hydra-colorlog = "*"
 torch = ">=1.4.0"
 tensorboardX = ">=2.0"
-tokenizers = ">=0.1.1"
+tokenizers = ">=0.2.0"
 transformers = ">=2.3.0"
 diskarray = ">=0.1.9"
 

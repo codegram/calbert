@@ -65,10 +65,15 @@ class TestDataset:
 
         tensor = train_ds[0]
         assert tensor.shape == (4, 12)
+        assert [example[0].tolist() for example in train_ds] == [
+            [4, 39, 12, 27, 30, 32, 3, 39, 10, 5, 14, 3],
+            [4, 39, 9, 14, 25, 36, 3, 39, 13, 18, 26, 3],
+            [4, 39, 13, 18, 26, 31, 3, 39, 12, 18, 30, 3],
+        ]
         assert [tokenizer.decode(example[0].tolist()) for example in train_ds] == [
-            "[CLS] Port[SEP] D'a[SEP]",
-            "[CLS] Camí[SEP] Sen[SEP]",
-            "[CLS] Sens[SEP] Per[SEP]",
+            "Port D'a",
+            "Camí Sen",
+            "Sens Per",
         ]
 
     @pytest.mark.it("Loads only a subset of the data, with a minimum of 1 row")
