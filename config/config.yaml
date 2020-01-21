@@ -15,7 +15,7 @@ seed: 42
 training:
   machine_type: v100
 
-  max_seq_length: 128
+  max_seq_length: 512
 
   masked_lm_prob: 0.10
   num_train_steps: 125000 #1000 # 125000
