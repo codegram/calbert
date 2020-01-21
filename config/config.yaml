@@ -15,7 +15,7 @@ seed: 42
 training:
   machine_type: v100
 
-  max_seq_length: 512
+  max_seq_length: 128
 
   masked_lm_prob: 0.10
   num_train_steps: 125000 #1000 # 125000
@@ -23,6 +23,7 @@ training:
   epochs: 1 # used only if num_train_steps <= 0, otherwise autocalculated
 
   weight_decay: 0.0
+  adam_epsilon: 1e-8
   learning_rate: 5e-5 # 1.76e-3
   max_grad_norm: 1.0
 
