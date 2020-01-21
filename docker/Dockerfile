@@ -5,4 +5,4 @@ WORKDIR /workspace
 COPY requirements.txt /workspace
 
 RUN pip install -r requirements.txt
-RUN pip install tensorboard
+RUN pip install wandb spell tensorboard

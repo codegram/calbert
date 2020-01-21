@@ -12,5 +12,4 @@ tokenizer/
 docker/requirements.txt
 wandb/
 *.pkl
-model/
 final-checkpoint/

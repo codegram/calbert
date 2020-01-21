@@ -20,13 +20,13 @@ import wandb
 from transformers import (
     AlbertConfig,
     AlbertForMaskedLM,
-    AdamW,
     get_linear_schedule_with_warmup,
 )
 
 from .tokenizer import CalbertTokenizer
 from .dataset import CalbertDataset
 from .utils import normalize_path
+from .lamb import Lamb
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -309,31 +309,8 @@ def _train(args, cfg, dataset, model, tokenizer, device):
             len(train_dataloader) // gradient_accumulation_steps * cfg.training.epochs
         )
 
-    # Prepare optimizer and schedule (linear warmup and decay)
-    no_decay = ["bias", "LayerNorm.weight"]
-    optimizer_grouped_parameters = [
-        {
-            "params": [
-                p
-                for n, p in model.named_parameters()
-                if not any(nd in n for nd in no_decay)
-            ],
-            "weight_decay": cfg.training.weight_decay,
-        },
-        {
-            "params": [
-                p
-                for n, p in model.named_parameters()
-                if any(nd in n for nd in no_decay)
-            ],
-            "weight_decay": 0.0,
-        },
-    ]
-    optimizer = AdamW(
-        optimizer_grouped_parameters,
-        lr=cfg.training.learning_rate,
-        eps=cfg.training.adam_epsilon,
-    )
+    optimizer = Lamb(model.parameters(), lr=cfg.training.learning_rate, weight_decay=cfg.training.weight_decay, betas=(.9, .999), adam=False)
+
     scheduler = get_linear_schedule_with_warmup(
         optimizer,
         num_warmup_steps=cfg.training.num_warmup_steps,
@@ -633,7 +610,7 @@ def train(args, cfg):
         for k in c.keys():
             wandb.config[k] = c[k]
 
-    config = AlbertConfig(**c)
+    config = AlbertConfig(vocab_size=cfg.vocab.max_size, **c)
 
     model = AlbertForMaskedLM(config)
 

@@ -23,8 +23,7 @@ training:
   epochs: 1 # used only if num_train_steps <= 0, otherwise autocalculated
 
   weight_decay: 0.0
-  adam_epsilon: 1e-8
-  learning_rate: 5e-5 # 1.76e-3
+  learning_rate: .00176
   max_grad_norm: 1.0
 
 defaults:
