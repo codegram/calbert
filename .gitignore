@@ -13,3 +13,5 @@ docker/requirements.txt
 wandb/
 *.pkl
 final-checkpoint/
+model/
+testy.py
