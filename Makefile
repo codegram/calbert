@@ -1,12 +1,12 @@
 workflow:
-	poetry run spell workflow --pip-req requirements.txt --repo repo=. 'python -m calbert workflow'
+	poetry run spell workflow --docker codegram/calbert:latest --repo repo=. 'python -m calbert workflow'
 
 deps: pyproject.toml
 	poetry install
-	poetry export -f requirements.txt
 
-docker: deps
-	cp requirements.txt docker
+docker: 
+	cp pyproject.toml docker
+	cp poetry.lock docker
 	docker build -t codegram/calbert ./docker
 
 docker-push:

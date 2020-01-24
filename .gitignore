@@ -9,7 +9,8 @@ run/
 runs/
 *.txt
 tokenizer/
-docker/requirements.txt
+docker/pyproject.toml
+docker/poetry.lock
 wandb/
 *.pkl
 final-checkpoint/

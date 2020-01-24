@@ -2,7 +2,8 @@ FROM codegram/apex-pytorch1.4-cuda10.1:latest
 
 WORKDIR /workspace
 
-COPY requirements.txt /workspace
+COPY pyproject.toml /workspace
+COPY poetry.lock /workspace
 
-RUN pip install -r requirements.txt
-RUN pip install wandb spell tensorboard
+RUN pip install poetry
+RUN poetry install

@@ -23,62 +23,65 @@ def training_args_cfg():
             with folder() as tokenizer_dir:
                 with folder() as dataset_dir:
                     with folder() as model_dir:
-                        tok, _ = train_tokenizer((train_file, tokenizer_dir))
-                        dataset_args = dataset.arguments().parse_args(
-                            [
-                                "--tokenizer-dir",
-                                tokenizer_dir,
-                                "--out-dir",
-                                dataset_dir,
-                                "--train-file",
-                                train_file,
-                                "--valid-file",
-                                valid_file,
+                        with folder() as wandb_dir:
+                            tok, _ = train_tokenizer((train_file, tokenizer_dir))
+                            dataset_args = dataset.arguments().parse_args(
+                                [
+                                    "--tokenizer-dir",
+                                    tokenizer_dir,
+                                    "--out-dir",
+                                    dataset_dir,
+                                    "--train-file",
+                                    train_file,
+                                    "--valid-file",
+                                    valid_file,
+                                ]
+                            )
+                            dataset_config = [
+                                "training.max_seq_length=12",
+                                "data.processing_minibatch_size=2",
+                                "vocab.max_size=10",
                             ]
-                        )
-                        dataset_config = [
-                            "training.max_seq_length=12",
-                            "data.processing_minibatch_size=2",
-                            "vocab.max_size=10",
-                        ]
-                        dataset_cfg = OmegaConf.from_dotlist(dataset_config)
+                            dataset_cfg = OmegaConf.from_dotlist(dataset_config)
 
-                        dataset.process(
-                            dataset_args, dataset_cfg,
-                        )
+                            dataset.process(
+                                dataset_args, dataset_cfg,
+                            )
 
-                        training_args = training.arguments().parse_args(
-                            [
-                                "--tokenizer-dir",
-                                tokenizer_dir,
-                                "--out-dir",
-                                model_dir,
-                                "--dataset-dir",
-                                dataset_dir,
-                                "--train-batch-size",
-                                "2",
-                                "--eval-batch-size",
-                                "2",
-                                "--subset",
-                                "1.0",
+                            training_args = training.arguments().parse_args(
+                                [
+                                    "--tokenizer-dir",
+                                    tokenizer_dir,
+                                    "--out-dir",
+                                    model_dir,
+                                    "--dataset-dir",
+                                    dataset_dir,
+                                    # "--wandb-dir",
+                                    # wandb_dir,
+                                    "--train-batch-size",
+                                    "2",
+                                    "--eval-batch-size",
+                                    "2",
+                                    "--subset",
+                                    "1.0",
+                                ]
+                            )
+
+                            training_config = [
+                                "training.max_seq_length=12",
+                                "training.masked_lm_prob=0.1",
+                                "training.epochs=1",
+                                "training.weight_decay=0.0",
+                                "training.learning_rate=5e-05",
+                                "seed=42",
+                                "model.name=test",
+                                "vocab.lowercase=True",
+                                "vocab.max_size=10",
                             ]
-                        )
 
-                        training_config = [
-                            "training.max_seq_length=12",
-                            "training.masked_lm_prob=0.1",
-                            "training.epochs=1",
-                            "training.weight_decay=0.0",
-                            "training.learning_rate=5e-05",
-                            "seed=42",
-                            "model.name=test",
-                            "vocab.lowercase=True",
-                            "vocab.max_size=10",
-                        ]
+                            training_cfg = OmegaConf.from_dotlist(training_config)
 
-                        training_cfg = OmegaConf.from_dotlist(training_config)
-
-                        yield training_args, training_cfg, model_dir, tok
+                            yield training_args, training_cfg, model_dir, tok
 
 
 @pytest.mark.describe("training.train")
