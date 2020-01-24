@@ -9,7 +9,7 @@ from pathlib import Path
 from diskarray import DiskArray
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, TensorDataset
 from tqdm import tqdm, trange
 
 from .tokenizer import CalbertTokenizer
@@ -79,7 +79,7 @@ def _process_file(
             chunk(sentence_pairs(input_file), minibatch_size, None),
         ),
         desc="Tokenizing",
-        total=int(19557475 / minibatch_size)
+        total=int(19557475 / minibatch_size),
     )
 
     ids_type = dataset_type("ids", max_vocab_size)
@@ -200,9 +200,7 @@ def process(args, cfg):
     out_dir = normalize_path(args.out_dir)
     tokenizer_dir = normalize_path(args.tokenizer_dir)
 
-    tokenizer = CalbertTokenizer.from_dir(
-        tokenizer_dir, cfg.training.max_seq_length
-    )
+    tokenizer = CalbertTokenizer.from_dir(tokenizer_dir, cfg.training.max_seq_length)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -248,14 +246,14 @@ def dataset_type(element, max_vocab_size):
         return np.bool
 
 
-class CalbertDataset(Dataset):
+class CalbertDataset(TensorDataset):
     def __init__(
         self,
         dataset_dir: Path,
         split: str,
         max_seq_length: int,
         max_vocab_size: int,
-        subset: int = 1.0,
+        subset: float = 1.0,
     ):
         super(CalbertDataset, self).__init__()
 
@@ -273,8 +271,6 @@ class CalbertDataset(Dataset):
             .read()
             .strip()
         )
-
-        dataset_element(dataset_dir, split, max_seq_length, max_vocab_size, "ids"),
 
         self.effective_length = max(1, int(self.length * subset))
 
@@ -324,6 +320,10 @@ class CalbertDataset(Dataset):
                 ]
             )
         ).long()
+
+    @property
+    def items(self):
+        return self
 
     def __len__(self):
         return self.effective_length

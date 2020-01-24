@@ -1,12 +1,14 @@
 import logging
-import pytest
+import os
 import re
 import tempfile
 import glob
 import argparse
+import pytest
 from pathlib import Path
 
 from omegaconf import OmegaConf
+import wandb
 
 from calbert import dataset, training, tokenizer
 
@@ -21,84 +23,78 @@ def training_args_cfg():
             with folder() as tokenizer_dir:
                 with folder() as dataset_dir:
                     with folder() as model_dir:
-                        with folder() as tensorboard_dir:
-                            tok, _ = train_tokenizer((train_file, tokenizer_dir))
-                            dataset_args = dataset.arguments().parse_args(
-                                [
-                                    "--tokenizer-dir",
-                                    tokenizer_dir,
-                                    "--out-dir",
-                                    dataset_dir,
-                                    "--train-file",
-                                    train_file,
-                                    "--valid-file",
-                                    valid_file,
-                                ]
-                            )
-                            dataset_config = [
-                                "training.max_seq_length=12",
-                                "data.processing_minibatch_size=2",
-                                "vocab.max_size=10",
+                        tok, _ = train_tokenizer((train_file, tokenizer_dir))
+                        dataset_args = dataset.arguments().parse_args(
+                            [
+                                "--tokenizer-dir",
+                                tokenizer_dir,
+                                "--out-dir",
+                                dataset_dir,
+                                "--train-file",
+                                train_file,
+                                "--valid-file",
+                                valid_file,
                             ]
-                            dataset_cfg = OmegaConf.from_dotlist(dataset_config)
+                        )
+                        dataset_config = [
+                            "training.max_seq_length=12",
+                            "data.processing_minibatch_size=2",
+                            "vocab.max_size=10",
+                        ]
+                        dataset_cfg = OmegaConf.from_dotlist(dataset_config)
 
-                            dataset.process(
-                                dataset_args, dataset_cfg,
-                            )
+                        dataset.process(
+                            dataset_args, dataset_cfg,
+                        )
 
-                            training_args = training.arguments().parse_args(
-                                [
-                                    "--tokenizer-dir",
-                                    tokenizer_dir,
-                                    "--out-dir",
-                                    model_dir,
-                                    "--dataset-dir",
-                                    dataset_dir,
-                                    "--tensorboard-dir",
-                                    tensorboard_dir,
-                                    "--per_gpu_train_batch_size",
-                                    "2",
-                                    "--per_gpu_eval_batch_size",
-                                    "2",
-                                    "--logging_steps",
-                                    "1",
-                                    "--eval_steps",
-                                    "1",
-                                    "--subset",
-                                    "1.0",
-                                ]
-                            )
-
-                            training_config = [
-                                "training.max_seq_length=12",
-                                "training.masked_lm_prob=0.1",
-                                "training.num_train_steps=2",
-                                "training.num_warmup_steps=0",
-                                "training.epochs=1",
-                                "training.weight_decay=0.0",
-                                "training.learning_rate=5e-05",
-                                "training.adam_epsilon=1e-8",
-                                "training.max_grad_norm=1.0",
-                                "seed=42",
-                                "model.name=test",
-                                "vocab.lowercase=True",
-                                "vocab.max_size=10",
+                        training_args = training.arguments().parse_args(
+                            [
+                                "--tokenizer-dir",
+                                tokenizer_dir,
+                                "--out-dir",
+                                model_dir,
+                                "--dataset-dir",
+                                dataset_dir,
+                                "--train-batch-size",
+                                "2",
+                                "--eval-batch-size",
+                                "2",
+                                "--subset",
+                                "1.0",
                             ]
+                        )
 
-                            training_cfg = OmegaConf.from_dotlist(training_config)
+                        training_config = [
+                            "training.max_seq_length=12",
+                            "training.masked_lm_prob=0.1",
+                            "training.epochs=1",
+                            "training.weight_decay=0.0",
+                            "training.learning_rate=5e-05",
+                            "seed=42",
+                            "model.name=test",
+                            "vocab.lowercase=True",
+                            "vocab.max_size=10",
+                        ]
 
-                            yield training_args, training_cfg, model_dir, tensorboard_dir, tok
+                        training_cfg = OmegaConf.from_dotlist(training_config)
+
+                        yield training_args, training_cfg, model_dir, tok
 
 
 @pytest.mark.describe("training.train")
 class TestTraining:
     @pytest.mark.it("Trains the model")
     def test_process(self, training_args_cfg):
-        args, cfg, model_path, tensorboard_dir, tok = training_args_cfg
+        args, cfg, model_path, tok = training_args_cfg
 
-        args.wandb = False
+        os.environ["WANDB_MODE"] = "dryrun"
+        os.environ["WANDB_TEST"] = "True"
 
-        model = training.train(args, cfg)
+        learn = training.train(args, cfg)
+
+        assert (Path(wandb.run.dir) / "bestmodel.pth").exists()
+
+        model = learn.model.albert
 
         encoding = tok.encode("Hola com anem")
         (
@@ -109,16 +105,20 @@ class TestTraining:
         ) = encoding_to_tensor(encoding)
 
         masked_token_ids, labels = training.mask_tokens(
-            token_ids, special_tokens_mask=special_tokens_mask, tokenizer=tok, cfg=cfg,
+            token_ids,
+            special_tokens_mask=special_tokens_mask,
+            tok=tok,
+            cfg=cfg,
+            ignore_index=training.IGNORE_INDEX,
         )
 
         batch_inputs = masked_token_ids.unsqueeze(0)
 
-        results = open(model_path + "/eval_results.txt").read()
-        perplexity = int(re.match(r"perplexity = tensor\(([0-9]+)", results)[1])
-
-        assert perplexity < 70
-
         predictions = model(batch_inputs, token_type_ids=type_ids.unsqueeze(0))[0][0]
 
         assert predictions.shape == (cfg.training.max_seq_length, len(tok))
+
+        learn.validate()
+
+        perplexity = learn.metrics[0].value
+        assert perplexity < 50

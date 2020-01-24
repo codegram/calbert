@@ -96,8 +96,7 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
     r = client.runs.new(
         command=" ".join(
             [
-                "mkdir -p data && cp dataset/* data &&"
-                "python",
+                "mkdir -p data && cp dataset/* data &&" "python",
                 "-m calbert",
                 "train_model",
                 "--tokenizer-dir",
@@ -106,13 +105,11 @@ def train_model(client, cfg, tokenizer_path, dataset_path):
                 "data",
                 "--out-dir",
                 "model",
-                "--tensorboard-dir",
-                "tensorboard",
+                "--wandb-dir",
+                "wandb",
                 # "--fp16",
-                "--wandb",
             ]
         ),
-        tensorboard_directory="/spell/tensorboard",
         commit_label="repo",
         docker_image="codegram/calbert:latest",
         machine_type=cfg.training.machine_type,

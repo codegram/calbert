@@ -15,3 +15,4 @@ wandb/
 final-checkpoint/
 model/
 testy.py
+models/

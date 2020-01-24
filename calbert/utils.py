@@ -8,4 +8,7 @@ from hydra.utils import to_absolute_path
 
 def normalize_path(p: Path) -> Path:
     "Converts a path into absolute gathering Hydra's original directory"
-    return Path(to_absolute_path(str(p)))
+    try:
+        return Path(to_absolute_path(str(p)))
+    except AttributeError:  # if we're not in Hydra
+        return p.absolute()

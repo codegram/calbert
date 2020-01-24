@@ -18,13 +18,13 @@ training:
   max_seq_length: 512
 
   masked_lm_prob: 0.10
-  num_train_steps: 125000 #1000 # 125000
-  num_warmup_steps: 3125 # 100 # 3125
+  #num_train_steps: 125000 #1000 # 125000
+  #num_warmup_steps: 3125 # 100 # 3125
   epochs: 1 # used only if num_train_steps <= 0, otherwise autocalculated
 
   weight_decay: 0.0
   learning_rate: .00176
-  max_grad_norm: 1.0
+  # max_grad_norm: 1.0
 
 defaults:
   - model: tiny
