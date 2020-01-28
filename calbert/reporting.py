@@ -64,16 +64,19 @@ class WandbReporter(WandbCallback):
         if self.log_preds:
             b = self.valid_dl.one_batch()
             if isinstance(b, tuple):
-                self.learn.model.__class__ = AlbertForMaskedLM
+                model = self.learn.model.module if hasattr(self.learn.model, "module") else self.learn.model
+                kls = model.__class__
 
-                loss, prediction_scores = self.learn.model(
+                model.__class__ = AlbertForMaskedLM
+
+                loss, prediction_scores = model(
                     b[0],
                     masked_lm_labels=b[1],
                     attention_mask=b[2],
                     token_type_ids=b[3],
                 )
 
-                self.learn.model.__class__ = self.model_class
+                model.__class__ = kls
 
                 predicted = torch.argmax(prediction_scores, dim=2).tolist()
 
