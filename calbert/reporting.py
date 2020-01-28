@@ -2,7 +2,7 @@ from pathlib import Path
 
 import torch
 import wandb
-from fastai2.basics import random, rank_distrib
+from fastai2.basics import random, rank_distrib, num_distrib
 from fastai2.callback.wandb import WandbCallback, wandb_process
 from transformers import AlbertForMaskedLM
 
@@ -52,7 +52,7 @@ class WandbReporter(WandbCallback):
             idxs = wandbRandom.sample(range(len(self.dls.valid_ds)), self.n_preds)
 
             items = [self.dls.valid_ds[i] for i in idxs]
-            self.valid_dl = self.dls.valid.new(items=items, bs=self.n_preds)
+            self.valid_dl = self.dls.valid.new(items=items, bs=self.n_preds, rank=rank_distrib(), world_size=num_distrib())
 
     def after_epoch(self):
         "Log validation loss and custom metrics"
