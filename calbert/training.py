@@ -255,6 +255,7 @@ def dataloaders(
 
 
 def get_learner(
+    args,
     cfg,
     model_path: Path,
     dataloaders: DataLoaders,
@@ -269,7 +270,11 @@ def get_learner(
         metrics=[Perplexity()],
     )
     learner.model_path = model_path
-    learner.add_cbs(
+    cbs = []
+    if args.distributed:
+        setup_distrib(args.local_rank)
+        cbs.append(FixedDistributedTrainer(args.local_rank))
+    cbs.extend(
         [
             WandbReporter(
                 tokenizer=tokenizer,
@@ -283,6 +288,9 @@ def get_learner(
             ReduceLROnPlateau(monitor="valid_loss", min_delta=0.1, patience=2),
         ]
     )
+    learner.add_cbs(cbs)
+    if args.distributed and rank_distrib() > 0:
+        learner.remove_cb(learner.progress)
     return learner
 
 
@@ -323,17 +331,16 @@ def train(args, cfg) -> Learner:
     dls = dataloaders(args, cfg, device=device, tokenizer=tokenizer, subset=args.subset)
 
     learn = get_learner(
-        cfg, model_path=args.out_dir, dataloaders=dls, model=model, tokenizer=tokenizer
+        args,
+        cfg,
+        model_path=args.out_dir,
+        dataloaders=dls,
+        model=model,
+        tokenizer=tokenizer,
     )
 
     if args.fp16:
         learn = learn.to_fp16()
-
-    if args.distributed:
-        setup_distrib(args.local_rank)
-        learn.add_cb(FixedDistributedTrainer(args.local_rank))
-        if rank_distrib() > 0:
-            learn.remove_cb(learn.progress)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
