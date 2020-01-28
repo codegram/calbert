@@ -6,11 +6,11 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-from fastai2.basics import Learner, Transform, rank_distrib, random, noop
+from fastai2.basics import Learner, Transform, rank_distrib, random, noop, to_device
 from fastai2.callback import progress, schedule, fp16
 from fastai2.callback.all import SaveModelCallback, ReduceLROnPlateau
 from fastai2.metrics import accuracy, Perplexity
-from fastai2.data.core import TfmdDL, DataBunch, DataSource
+from fastai2.data.core import TfmdDL, DataLoaders
 from fastai2.optimizer import Lamb
 from fastai2.distributed import setup_distrib, DistributedDL, DistributedTrainer
 import wandb
@@ -127,19 +127,17 @@ def mask_tokens(
     return inputs, labels
 
 
-class TrainableAlbert(nn.Module):
-    def __init__(self, albert: AlbertForMaskedLM):
-        super(TrainableAlbert, self).__init__()
-        self.albert = albert
+class TrainableAlbert(AlbertForMaskedLM):
+    def __init__(self, config: AlbertConfig):
+        super(TrainableAlbert, self).__init__(config)
 
     def forward(self, masked_inputs, labels, attention_masks, token_type_ids):
-        outputs = self.albert(
+        return super().forward(
             masked_inputs,
             masked_lm_labels=labels,
             attention_mask=attention_masks,
             token_type_ids=token_type_ids,
-        )
-        return outputs[0]
+        )[0]
 
 
 class MaskedSentencePair(Tuple):
@@ -181,18 +179,19 @@ def albert_config(cfg, args) -> AlbertConfig:
     return AlbertConfig(vocab_size=cfg.vocab.max_size, **dict(cfg.model))
 
 
-def initialize_model(cfg, args, tokenizer: CalbertTokenizer) -> AlbertForMaskedLM:
+def initialize_model(cfg, args, tokenizer: CalbertTokenizer) -> TrainableAlbert:
     config = albert_config(cfg, args)
-    model = AlbertForMaskedLM(config)
+    model = TrainableAlbert(config)
 
     # Hack until this is released: https://github.com/huggingface/transformers/commit/100e3b6f2133074bf746a78eb4c3a0ad3e939b5f#diff-961191c6a9886609f732e878f0a1fa30
     # Otherwise the resizing doesn't apply for some layers
-    model.predictions.decoder.bias = model.predictions.bias
+    # model.predictions.decoder.bias = model.predictions.bias
 
     model_to_resize = (
         model.module if hasattr(model, "module") else model
     )  # Take care of distributed/parallel training
     model_to_resize.resize_token_embeddings(len(tokenizer))
+    to_device(model)
     return model
 
 
@@ -203,9 +202,9 @@ def get_device(args) -> torch.device:
         return torch.device("cuda", args.local_rank)
 
 
-def databunch(
+def dataloaders(
     args, cfg, device: torch.device, tokenizer: CalbertTokenizer, subset=1.0
-) -> DataBunch:
+) -> DataLoaders:
     train_ds = CalbertDataset(
         args.dataset_dir,
         "train",
@@ -225,6 +224,7 @@ def databunch(
         train_ds,
         bs=args.train_batch_size,
         after_item=[Mask(tok=tokenizer, cfg=cfg)],
+        after_batch=to_device,
         shuffle=True,
         num_workers=20,
     )
@@ -232,22 +232,23 @@ def databunch(
         valid_ds,
         bs=args.eval_batch_size,
         after_item=[Mask(tok=tokenizer, cfg=cfg)],
+        after_batch=to_device,
         num_workers=2,
     )
 
-    return DataBunch(train_dl, valid_dl, device=device)
+    return DataLoaders(train_dl, valid_dl, device=device)
 
 
 def get_learner(
     cfg,
     model_path: Path,
-    databunch: DataBunch,
-    model: AlbertForMaskedLM,
+    dataloaders: DataLoaders,
+    model: TrainableAlbert,
     tokenizer: CalbertTokenizer,
 ) -> Learner:
     learner = Learner(
-        databunch,
-        TrainableAlbert(albert=model),
+        dataloaders,
+        model,
         loss_func=lambda loss, _: loss,
         opt_func=partial(Lamb, lr=0.1, wd=cfg.training.weight_decay),
         metrics=[Perplexity()],
@@ -289,10 +290,10 @@ def train(args, cfg) -> Learner:
 
     args.wandb_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.main_process:
-        wandb.init(
-            project="calbert", name=model_name, tags=run_tags, dir=str(args.wandb_dir)
-        )
+    # if args.main_process:
+    wandb.init(
+        project="calbert", name=model_name, tags=run_tags, dir=str(args.wandb_dir)
+    )
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -303,10 +304,10 @@ def train(args, cfg) -> Learner:
 
     device = get_device(args)
 
-    db = databunch(args, cfg, device=device, tokenizer=tokenizer, subset=args.subset)
+    dls = dataloaders(args, cfg, device=device, tokenizer=tokenizer, subset=args.subset)
 
     learn = get_learner(
-        cfg, model_path=args.out_dir, databunch=db, model=model, tokenizer=tokenizer
+        cfg, model_path=args.out_dir, dataloaders=dls, model=model, tokenizer=tokenizer
     )
 
     if args.fp16:
@@ -325,7 +326,7 @@ def train(args, cfg) -> Learner:
         log.info(f"Pretraining ALBERT: {args}")
         log.info(f"Configuration: {cfg.pretty()}")
         log.info(
-            f"Sentence pairs: {len(db.train_ds)} ({args.subset * 100}% of the dataset)"
+            f"Sentence pairs: {len(dls.train_ds)} ({args.subset * 100}% of the dataset)"
         )
         log.warning(
             "GPUs: %s, distributed training: %s, 16-bits training: %s",

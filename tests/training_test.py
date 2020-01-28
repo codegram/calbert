@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 import wandb
 
 from calbert import dataset, training, tokenizer
+from transformers import AlbertForMaskedLM
 
 from .tokenizer_test import train_tokenizer, encoding_to_tensor
 from .conftest import InputData, folder
@@ -97,7 +98,7 @@ class TestTraining:
 
         assert (Path(wandb.run.dir) / "bestmodel.pth").exists()
 
-        model = learn.model.albert
+        model = learn.model
 
         encoding = tok.encode("Hola com anem")
         (
@@ -117,9 +118,20 @@ class TestTraining:
 
         batch_inputs = masked_token_ids.unsqueeze(0)
 
-        predictions = model(batch_inputs, token_type_ids=type_ids.unsqueeze(0))[0][0]
+        model.__class__ = AlbertForMaskedLM
+
+        predictions = model(
+            batch_inputs,
+            token_type_ids=type_ids.unsqueeze(0),
+            # labels.unsqueeze(0),
+            # attention_mask.unsqueeze(0),
+        )[0][0]
+
+        print(predictions)
 
         assert predictions.shape == (cfg.training.max_seq_length, len(tok))
+
+        model.__class__ = training.TrainableAlbert
 
         learn.validate()
 

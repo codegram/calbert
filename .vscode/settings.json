@@ -1,5 +1,5 @@
 {
-  "python.pythonPath": ".venv/bin/python",
+  "python.pythonPath": "/Users/txus/Library/Caches/pypoetry/virtualenvs/calbert-rFhS7Vgj-py3.7/bin/python",
   "python.linting.pylamaEnabled": false,
   "python.linting.flake8Enabled": true,
   "python.linting.enabled": true,
