@@ -4,6 +4,7 @@ import torch
 import wandb
 from fastai2.basics import random, rank_distrib
 from fastai2.callback.wandb import WandbCallback, wandb_process
+from transformers import AlbertForMaskedLM
 
 from calbert.tokenizer import CalbertTokenizer
 
@@ -17,6 +18,7 @@ class WandbReporter(WandbCallback):
         self,
         tokenizer: CalbertTokenizer,
         ignore_index: int,
+        model_class,
         log_examples_html=False,
         **kwargs
     ):
@@ -24,6 +26,7 @@ class WandbReporter(WandbCallback):
         self.tokenizer = tokenizer
         self.log_examples_html = log_examples_html
         self.ignore_index = ignore_index
+        self.model_class = model_class
 
     def begin_fit(self):
         "Call watch method to log model topology, gradients & weights"
@@ -60,20 +63,22 @@ class WandbReporter(WandbCallback):
 
         if self.log_preds:
             b = self.valid_dl.one_batch()
-            if not isinstance(b, tuple):
-                sentence_pair = b[0]
+            if isinstance(b, tuple):
+                self.learn.model.__class__ = AlbertForMaskedLM
 
                 loss, prediction_scores = self.learn.model(
-                    sentence_pair[0],
-                    masked_lm_labels=sentence_pair[1],
-                    attention_mask=sentence_pair[2],
-                    token_type_ids=sentence_pair[3],
+                    b[0],
+                    masked_lm_labels=b[1],
+                    attention_mask=b[2],
+                    token_type_ids=b[3],
                 )
+
+                self.learn.model.__class__ = self.model_class
 
                 predicted = torch.argmax(prediction_scores, dim=2).tolist()
 
-                encoded_sentences = sentence_pair[0].tolist()
-                encoded_answers = sentence_pair[1].tolist()
+                encoded_sentences = b[0].tolist()
+                encoded_answers = b[1].tolist()
 
                 examples = []
                 formatted_examples = []
@@ -119,21 +124,13 @@ class WandbReporter(WandbCallback):
                     predicted_s = ""
                     correct_s = ""
 
-                report.update(
-                    {
-                        "Prediction Examples": wandb.Table(
-                            data=examples, columns=["Correct", "Predicted"]
-                        )
-                    }
-                )
-
                 if self.log_examples_html:
                     html = (
                         "<html><head></head><body><dl>"
                         + "<br/>".join(
                             [
                                 "<dt>" + e[0] + "</dt><dd>" + e[1] + "</dd>"
-                                for e in examples
+                                for e in formatted_examples
                             ]
                         )
                         + "</dl></body></html>"
@@ -144,6 +141,14 @@ class WandbReporter(WandbCallback):
                                 data=html, inject=True
                             )
                         },
+                    )
+                else:
+                    report.update(
+                        {
+                            "Prediction Examples": wandb.Table(
+                                data=examples, columns=["Correct", "Predicted"]
+                            )
+                        }
                     )
 
         metric_names = list(self.recorder.metric_names).copy()

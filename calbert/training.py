@@ -226,14 +226,14 @@ def dataloaders(
         after_item=[Mask(tok=tokenizer, cfg=cfg)],
         after_batch=to_device,
         shuffle=True,
-        num_workers=20,
+        num_workers=0,
     )
     valid_dl = TfmdDL(
         valid_ds,
         bs=args.eval_batch_size,
         after_item=[Mask(tok=tokenizer, cfg=cfg)],
         after_batch=to_device,
-        num_workers=2,
+        num_workers=0,
     )
 
     return DataLoaders(train_dl, valid_dl, device=device)
@@ -259,7 +259,9 @@ def get_learner(
             WandbReporter(
                 tokenizer=tokenizer,
                 log="all",
-                log_examples_html=False,
+                log_preds=True,
+                log_examples_html=True,
+                model_class=TrainableAlbert,
                 ignore_index=IGNORE_INDEX,
             ),
             SaveModelCallback(every_epoch=True),
