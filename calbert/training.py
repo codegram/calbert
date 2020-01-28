@@ -290,7 +290,6 @@ def train(args, cfg) -> Learner:
 
     args.wandb_dir.mkdir(parents=True, exist_ok=True)
 
-    # if args.main_process:
     wandb.init(
         project="calbert", name=model_name, tags=run_tags, dir=str(args.wandb_dir)
     )
@@ -315,7 +314,7 @@ def train(args, cfg) -> Learner:
 
     if args.distributed:
         setup_distrib(args.local_rank)
-        learn = learn.to_distributed()
+        learn = learn.to_distributed(args.local_rank)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
