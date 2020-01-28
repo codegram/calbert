@@ -63,7 +63,7 @@ class TestCalbertokenizer:
     def test_train(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
 
-        assert len(t) == 40
+        assert len(t) == 35
         assert t.id_to_token(0) == "<unk>"
         assert t.id_to_token(1) == "<pad>"
         assert t.id_to_token(2) == "[MASK]"
@@ -73,7 +73,7 @@ class TestCalbertokenizer:
     @pytest.mark.it("Encodes single sentences BERT-style with CLS and SEP")
     def test_single_sentence_encoding(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
-        encoded = t.encode("hola com anem")
+        encoded = t.encode("hOla com anem")
         assert len(encoded.ids) == 12
         assert t.id_to_token(encoded.ids[0]) == "[CLS]"
         assert t.id_to_token(encoded.ids[-1]) == "[SEP]"
@@ -105,7 +105,7 @@ class TestCalbertokenizer:
     def test_truncates_encodings(self, input_file_and_outdir):
         t, outdir = train_tokenizer(input_file_and_outdir)
 
-        encoded = t.encode("hola com anem")
+        encoded = t.encode("Hola com Anem")
         assert len(encoded.tokens) == 12
         assert encoded.tokens == [
             "[CLS]",
@@ -170,8 +170,8 @@ class TestCalbertokenizer:
         got = list(glob.glob(outdir + "/*"))
         got.sort()
         expected = [
-            outdir + f"/ca.bpe.{len(t)}-vocab.json",
-            outdir + f"/ca.bpe.{len(t)}-merges.txt",
+            outdir + f"/ca.bpe.uncased.{len(t)}-vocab.json",
+            outdir + f"/ca.bpe.uncased.{len(t)}-merges.txt",
         ]
         expected.sort()
         assert got == expected

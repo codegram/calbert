@@ -36,6 +36,7 @@ def dataset_args_cfg():
                         "training.max_seq_length=12",
                         "data.processing_minibatch_size=2",
                         "vocab.max_size=50",
+                        "vocab.lowercase=False",
                     ]
                     cfg = OmegaConf.from_dotlist(config)
                     yield args, cfg, tokenizer

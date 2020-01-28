@@ -139,7 +139,7 @@ def run(args, cfg):
     wait(client, data_run)
 
     tokenizer_run, tokenizer_path = create_tokenizer(
-        client, cfg, data_path, forced_run_id=372
+        client, cfg, data_path #, forced_run_id=372
     )
     wait(client, tokenizer_run)
 
@@ -148,5 +148,5 @@ def run(args, cfg):
     )
     wait(client, dataset_run)
 
-    model_run, model_path = train_model(client, cfg, tokenizer_path, dataset_path)
-    wait(client, model_run, logs=True)
+    #model_run, model_path = train_model(client, cfg, tokenizer_path, dataset_path)
+    #wait(client, model_run, logs=True)

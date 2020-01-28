@@ -42,6 +42,7 @@ def training_args_cfg():
                                 "training.max_seq_length=12",
                                 "data.processing_minibatch_size=2",
                                 "vocab.max_size=10",
+                                "vocab.lowercase=False",
                             ]
                             dataset_cfg = OmegaConf.from_dotlist(dataset_config)
 
@@ -76,7 +77,7 @@ def training_args_cfg():
                                 "training.learning_rate=5e-05",
                                 "seed=42",
                                 "model.name=test",
-                                "vocab.lowercase=True",
+                                "vocab.lowercase=False",
                                 "vocab.max_size=10",
                             ]
 

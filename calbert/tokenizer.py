@@ -8,7 +8,7 @@ import torch
 from tokenizers import pre_tokenizers, decoders, trainers, Tokenizer, Encoding
 from tokenizers.processors import BertProcessing
 from tokenizers.models import BPE
-from tokenizers.normalizers import NFKC
+from tokenizers.normalizers import NFKC, Sequence, Lowercase
 from tokenizers.implementations.base_tokenizer import BaseTokenizer
 
 from typing import Optional, List, Union
@@ -58,7 +58,11 @@ class CalbertTokenizer(BaseTokenizer):
         else:
             tokenizer = Tokenizer(BPE.empty())
 
-        tokenizer.normalizer = NFKC.new(lowercase=lowercase)
+        if lowercase:
+            tokenizer.normalizer = Sequence.new([NFKC.new(), Lowercase.new()])
+        else:
+            tokenizer.normalizer = NFKC.new()
+
         tokenizer.pre_tokenizer = pre_tokenizers.Metaspace.new(
             replacement=replacement, add_prefix_space=add_prefix_space
         )
@@ -228,10 +232,14 @@ def train(args, cfg) -> Tokenizer:
         min_frequency=cfg.vocab.min_frequency,
     )
 
-    tokenizer.save(str(out_dir), f"ca.bpe.{len(tokenizer)}")
+    name = ['ca', 'bpe']
+    name.append('uncased' if cfg.vocab.lowercase else 'cased')
+    name.append(str(len(tokenizer)))
+
+    tokenizer.save(str(out_dir), '.'.join(name))
 
     log.info(
-        f"Saved tokenizer as {out_dir}/ca.bpe.{len(tokenizer)}[-vocab.json|-merges.txt]"
+        f"Saved tokenizer as {out_dir}/{'.'.join(name)}[-vocab.json|-merges.txt]"
     )
 
     return tokenizer
