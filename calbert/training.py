@@ -13,6 +13,7 @@ from fastai2.metrics import accuracy, Perplexity
 from fastai2.data.core import TfmdDL, DataLoaders
 from fastai2.optimizer import Lamb
 from fastai2.distributed import setup_distrib, DistributedDL, DistributedTrainer
+from torch.nn.parallel import DistributedDataParallel
 import wandb
 
 from transformers import (
@@ -28,6 +29,20 @@ from calbert.reporting import WandbReporter
 log = logging.getLogger(__name__)
 
 IGNORE_INDEX = -100  # Pytorch CrossEntropyLoss defaults to ignoring -100
+
+
+class FixedDistributedTrainer(DistributedTrainer):
+    def begin_fit(self):
+        self.learn.model = DistributedDataParallel(
+            self.model,
+            device_ids=[self.cuda_id],
+            output_device=self.cuda_id,
+            find_unused_parameters=True,
+        )
+        self.old_dls = list(self.dls)
+        self.learn.dls.loaders = [self._wrap_dl(dl) for dl in self.dls]
+        if rank_distrib() > 0:
+            self.learn.logger = noop
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -316,7 +331,9 @@ def train(args, cfg) -> Learner:
 
     if args.distributed:
         setup_distrib(args.local_rank)
-        learn = learn.to_distributed(args.local_rank)
+        learn.add_cb(FixedDistributedTrainer(args.local_rank))
+        if rank_distrib() > 0:
+            learn.remove_cb(learn.progress)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",

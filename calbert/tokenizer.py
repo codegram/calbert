@@ -40,6 +40,7 @@ class CalbertTokenizer(BaseTokenizer):
     def __init__(
         self,
         max_seq_length: int,
+        lowercase: bool = False,
         vocab_file: Optional[str] = None,
         merges_file: Optional[str] = None,
         unk_token: str = "<unk>",
@@ -57,7 +58,7 @@ class CalbertTokenizer(BaseTokenizer):
         else:
             tokenizer = Tokenizer(BPE.empty())
 
-        tokenizer.normalizer = NFKC.new()
+        tokenizer.normalizer = NFKC.new(lowercase=lowercase)
         tokenizer.pre_tokenizer = pre_tokenizers.Metaspace.new(
             replacement=replacement, add_prefix_space=add_prefix_space
         )
@@ -217,7 +218,9 @@ def train(args, cfg) -> Tokenizer:
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    tokenizer = CalbertTokenizer(max_seq_length=cfg.training.max_seq_length)
+    tokenizer = CalbertTokenizer(
+        max_seq_length=cfg.training.max_seq_length, lowercase=cfg.vocab.lowercase
+    )
 
     tokenizer.train(
         [str(normalize_path(args.input_file))],
