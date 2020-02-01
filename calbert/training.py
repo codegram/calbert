@@ -157,8 +157,9 @@ class TrainableAlbert(AlbertForMaskedLM):
 
 class MaskedSentencePair(Tuple):
     def show(self, ctx=None, **kwargs):
-        masked_ids, labels, attention_masks, token_type_ids = self
-        return ctx["tokenizer"].decode(masked_ids)
+        ids = self[0]
+        return ids
+        #return ctx["tokenizer"].decode(ids)
 
 
 class Mask(Transform):
@@ -175,9 +176,12 @@ class Mask(Transform):
             cfg=self.cfg,
             ignore_index=IGNORE_INDEX,  # PyTorch CrossEntropyLoss defaults to ignoring -100
         )
-        return MaskedSentencePair(
-            (masked_ids, labels, attention_masks, token_type_ids, False)
-        )
+        return torch.stack([
+            masked_ids,
+            labels,
+            attention_masks,
+            token_type_ids,
+        ])
 
 
 def albert_config(cfg, args) -> AlbertConfig:

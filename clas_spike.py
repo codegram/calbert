@@ -48,10 +48,14 @@ class FineTune(AlbertForMaskedLM):
         super(FineTune, self).__init__(config)
 
     def forward(self, inputs):
-        masked_ids, labels, attention_masks, token_type_ids, _ = inputs
+        masked_ids, labels, attention_masks, token_type_ids = inputs.permute(1,0,2)
+
+        #print(labels.shape)
+        #print(labels.contiguous().shape)
+
         loss, _ = super().forward(
             masked_ids,
-            masked_lm_labels=labels,
+            masked_lm_labels=labels.contiguous(),
             attention_mask=attention_masks,
             token_type_ids=token_type_ids,
         )
@@ -85,6 +89,7 @@ class Tokenize(Transform):
         return TitledStr(decoded)
 
 class TokenizeForMasked(Tokenize):
+    loss_func=lambda x: x
     def encodes(self, o: str):
         encoding = self.tokenizer.encode(o)
         return TensorText(
@@ -138,12 +143,14 @@ def fine_tune(cfg):
         blocks=TextBlock(tokenizer=tokenizer, masked_lm=True),
         splitter=RandomSplitter(valid_pct=0.2, seed=42),
         get_items=partial(get_lines_from_files, pairs=False),
-        get_x=lambda x: x[0],
+        get_x=lambda x: x,
     )
 
     dsrc = sentiment_data.datasets(normalize_path(Path("../dataset")), verbose=True,)
 
     dls = dsrc.dataloaders(bs=16, after_item=[Mask(tok=tokenizer, cfg=cfg)])
+
+    #print(next(iter(dls.train)))
 
     config = AlbertConfig(
         vocab_size=cfg.vocab.max_size, **dict(cfg.model)
@@ -158,21 +165,24 @@ def fine_tune(cfg):
     to_device(model)
 
     def get_loss(inp, targ):
-        return 'he'
+        print(inp, targ)
+        return inp
 
     learn = Learner(
         dls=dls,
         model=model,
-        loss_func=get_loss,
+        #loss_func=CrossEntropyLossFlat(),
         #opt_func=partial(Lamb, lr=0.1, wd=cfg.training.weight_decay),
-        metrics=Perplexity(),
+        #metrics=Perplexity(),
         #splitter=partial(splitter, masked_lm=True),
     )
     learn.path = normalize_path(Path("../"))
     learn.model_dir = "model"
-    learn.load("bestmodel", strict=False)
+    #learn.load("bestmodel", strict=False)
 
     #learn.freeze()
+
+    #learn.show_results()
 
     learn.fit_one_cycle(1, 1e-02)
 
