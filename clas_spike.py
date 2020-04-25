@@ -3,12 +3,17 @@ import hydra
 from pathlib import Path
 from functools import partial
 
-from transformers import AlbertConfig, AlbertForSequenceClassification, AlbertForMaskedLM
+from transformers import (
+    AlbertConfig,
+    AlbertForSequenceClassification,
+    AlbertForMaskedLM,
+)
 
 import torch
 
 from fastai2.basics import (
-    Lamb, Perplexity,
+    Lamb,
+    Perplexity,
     accuracy,
     DataBlock,
     CategoryBlock,
@@ -42,16 +47,19 @@ class SentimentAnalysis(AlbertForSequenceClassification):
         o = super().forward(input_ids=x[0], attention_mask=x[1], token_type_ids=x[2])
         logits = o[0]
         return logits
-        
+
+
 class FineTune(AlbertForMaskedLM):
     def __init__(self, config: AlbertConfig):
         super(FineTune, self).__init__(config)
 
     def forward(self, inputs):
-        masked_ids, labels, attention_masks, token_type_ids = inputs.permute(1,0,2)
+        print(inputs.shape)
+        print(inputs)
+        masked_ids, labels, attention_masks, token_type_ids = inputs.permute(1, 0, 2)
 
-        #print(labels.shape)
-        #print(labels.contiguous().shape)
+        # print(labels.shape)
+        # print(labels.contiguous().shape)
 
         loss, _ = super().forward(
             masked_ids,
@@ -59,6 +67,7 @@ class FineTune(AlbertForMaskedLM):
             attention_mask=attention_masks,
             token_type_ids=token_type_ids,
         )
+        print(loss)
         return loss
 
 
@@ -88,8 +97,10 @@ class Tokenize(Transform):
         )
         return TitledStr(decoded)
 
+
 class TokenizeForMasked(Tokenize):
-    loss_func=lambda x: x
+    loss_func = lambda x: x
+
     def encodes(self, o: str):
         encoding = self.tokenizer.encode(o)
         return TensorText(
@@ -104,11 +115,12 @@ class TokenizeForMasked(Tokenize):
         )
 
 
-
 def TextBlock(tokenizer: CalbertTokenizer, masked_lm=False):
     "`TextBlock` for single-label categorical targets"
     return TransformBlock(
-        type_tfms=Tokenize(tokenizer=tokenizer) if masked_lm == False else TokenizeForMasked(tokenizer=tokenizer)
+        type_tfms=Tokenize(tokenizer=tokenizer)
+        if not masked_lm
+        else TokenizeForMasked(tokenizer=tokenizer)
     )
 
 
@@ -123,38 +135,38 @@ def get_lines_from_files(path: Path, pairs=True):
                 lines.append((text, kls))
             else:
                 lines.append(text)
-    return lines
+    return lines[:6]
 
 
 def splitter(m: AlbertForSequenceClassification, masked_lm=False):
     return (
         L(m.albert.embeddings, m.albert.encoder,).map(params)
         + L(m.albert.pooler, m.albert.pooler_activation).map(params)
-        + (L(m.dropout, m.classifier).map(params) if masked_lm == False else L(m.predictions).map(params))
+        + (
+            L(m.dropout, m.classifier).map(params)
+            if not masked_lm
+            else L(m.predictions).map(params)
+        )
     )
+
 
 def fine_tune(cfg):
     tokenizer = CalbertTokenizer.from_dir(
-        normalize_path(Path("../tokenizer")),
-        max_seq_length=cfg.training.max_seq_length,
+        normalize_path(Path("w/tokenizer")), max_seq_length=cfg.training.max_seq_length,
     )
 
     sentiment_data = DataBlock(
         blocks=TextBlock(tokenizer=tokenizer, masked_lm=True),
         splitter=RandomSplitter(valid_pct=0.2, seed=42),
-        get_items=partial(get_lines_from_files, pairs=False),
-        get_x=lambda x: x,
+        get_items=partial(get_lines_from_files, pairs=True),
+        get_x=lambda x: x[0],
     )
 
-    dsrc = sentiment_data.datasets(normalize_path(Path("../dataset")), verbose=True,)
+    dsrc = sentiment_data.datasets(normalize_path(Path("w/data")), verbose=True)
 
-    dls = dsrc.dataloaders(bs=16, after_item=[Mask(tok=tokenizer, cfg=cfg)])
+    dls = dsrc.dataloaders(bs=1, after_item=[Mask(tok=tokenizer, cfg=cfg)])
 
-    #print(next(iter(dls.train)))
-
-    config = AlbertConfig(
-        vocab_size=cfg.vocab.max_size, **dict(cfg.model)
-    )
+    config = AlbertConfig(vocab_size=cfg.vocab.max_size, **dict(cfg.model))
 
     model = FineTune(config=config)
 
@@ -171,26 +183,25 @@ def fine_tune(cfg):
     learn = Learner(
         dls=dls,
         model=model,
-        #loss_func=CrossEntropyLossFlat(),
-        #opt_func=partial(Lamb, lr=0.1, wd=cfg.training.weight_decay),
-        #metrics=Perplexity(),
-        #splitter=partial(splitter, masked_lm=True),
+        loss_func=CrossEntropyLossFlat(),
+        # opt_func=partial(Lamb, lr=0.1, wd=cfg.training.weight_decay),
+        # metrics=Perplexity(),
+        # splitter=partial(splitter, masked_lm=True),
     )
-    learn.path = normalize_path(Path("../"))
+    learn.path = normalize_path(Path("w"))
     learn.model_dir = "model"
-    #learn.load("bestmodel", strict=False)
+    # learn.load("bestmodel", strict=False)
 
-    #learn.freeze()
+    # learn.freeze()
 
-    #learn.show_results()
+    # learn.show_results()
 
     learn.fit_one_cycle(1, 1e-02)
 
 
 def train_classifier(cfg):
     tokenizer = CalbertTokenizer.from_dir(
-        normalize_path(Path("../tokenizer")),
-        max_seq_length=cfg.training.max_seq_length,
+        normalize_path(Path("w/tokenizer")), max_seq_length=cfg.training.max_seq_length,
     )
 
     sentiment_data = DataBlock(
@@ -201,7 +212,7 @@ def train_classifier(cfg):
         get_items=get_lines_from_files,
     )
 
-    dsrc = sentiment_data.datasets(normalize_path(Path("../dataset")), verbose=True,)
+    dsrc = sentiment_data.datasets(normalize_path(Path("w/data")), verbose=True,)
 
     dls = dsrc.dataloaders(bs=48)
 
@@ -224,18 +235,18 @@ def train_classifier(cfg):
         metrics=accuracy,
         splitter=splitter,
     )
-    learn.path = normalize_path(Path("../"))
+    learn.path = normalize_path(Path("w"))
     learn.model_dir = "model"
     learn.load("bestmodel", strict=False)
 
-    #learn.freeze()
+    # learn.freeze()
 
     learn.fit_one_cycle(10, 1e-02)
 
 
 @hydra.main(config_path="./config/config.yaml", strict=True)
 def main(cfg):
-    #train_classifier(cfg)
+    # train_classifier(cfg)
     fine_tune(cfg)
 
 
