@@ -40,7 +40,9 @@ def train(args, cfg) -> str:
 
     log.info(f'Will save to {prefix}')
 
-    cmd = f"--input={str(args.input_file.absolute())} --model_prefix={prefix} --vocab_size={vocab_size} --pad_id=0 --unk_id=1 --eos_id=-1 --bos_id=-1 --control_symbols=[CLS],[SEP],[MASK] --user_defined_symbols=(,),',\",-,.,–,£,€,$,·,´ --shuffle_input_sentence=true --input_sentence_size=10000000 --character_coverage=0.99995 --model_type=unigram"
+    rule = '_cf' if cfg.vocab.lowercase else ''
+
+    cmd = f"--normalization_rule_name=nmt_nfkc{rule} --input={str(args.input_file.absolute())} --model_prefix={prefix} --vocab_size={vocab_size} --pad_id=0 --unk_id=1 --eos_id=-1 --bos_id=-1 --control_symbols=[CLS],[SEP],[MASK] --user_defined_symbols=(,),',\",-,.,–,£,€,$,·,´ --shuffle_input_sentence=true --input_sentence_size=10000000 --character_coverage=0.99995 --model_type=unigram"
 
     spm.SentencePieceTrainer.Train(cmd)
 
