@@ -1,6 +1,3 @@
-workflow:
-	poetry run spell workflow --docker codegram/calbert:latest --repo repo=. 'python -m calbert workflow'
-
 deps: pyproject.toml
 	poetry install
 

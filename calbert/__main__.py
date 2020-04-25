@@ -4,25 +4,25 @@ import sys
 import argparse
 from pathlib import Path
 
-from . import tokenizer, training, dataset, workflow
+from . import tokenizer, training, dataset, export
 
 log = logging.getLogger(__name__)
 
 TASK_WITH_ARGS = (None, None)
 
-VALID_COMMANDS = ["train_tokenizer", "train_model", "dataset", "workflow"]
+VALID_COMMANDS = ["train_tokenizer", "train_model", "dataset", "export"]
 
 TASKS = {
     "train_tokenizer": tokenizer.train,
     "train_model": training.train,
     "dataset": dataset.process,
-    "workflow": workflow.run,
+    "export": export.run,
 }
 PARSERS = {
     "train_tokenizer": tokenizer.arguments,
     "train_model": training.arguments,
     "dataset": dataset.arguments,
-    "workflow": workflow.arguments,
+    "export": export.arguments,
 }
 
 

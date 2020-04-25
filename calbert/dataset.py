@@ -12,7 +12,7 @@ import torch
 from torch.utils.data import Dataset, TensorDataset
 from tqdm import tqdm, trange
 
-from .tokenizer import CalbertTokenizer
+# from .tokenizer import CalbertTokenizer
 from .utils import normalize_path
 
 log = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ def _load_memmap(
 
 
 def _process_file(
-    tokenizer: CalbertTokenizer,
+    tokenizer,
     input_file: Path,
     out_dir: Path,
     split: str,
@@ -200,7 +200,8 @@ def process(args, cfg):
     out_dir = normalize_path(args.out_dir)
     tokenizer_dir = normalize_path(args.tokenizer_dir)
 
-    tokenizer = CalbertTokenizer.from_dir(tokenizer_dir, cfg.training.max_seq_length)
+    tokenizer = True
+    # tokenizer = CalbertTokenizer.from_dir(tokenizer_dir, cfg.training.max_seq_length)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
