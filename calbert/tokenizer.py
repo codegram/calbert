@@ -12,16 +12,15 @@ from .utils import normalize_path
 log = logging.getLogger(__name__)
 
 
-class CalbertTokenizer(AlbertTokenizer):
-
-    def foo():
-        return 3
+def load(cfg, vocab_path: Path) -> AlbertTokenizer:
+    return AlbertTokenizer(str(vocab_path.absolute()), keep_accents=True, do_lower_case=cfg.vocab.lowercase)
 
 
 def arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train a tokenizer on some raw text")
     parser.add_argument("--input-file", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--num-threads", type=int, default=32)
     return parser
 
 
@@ -42,7 +41,7 @@ def train(args, cfg) -> str:
 
     rule = '_cf' if cfg.vocab.lowercase else ''
 
-    cmd = f"--normalization_rule_name=nmt_nfkc{rule} --input={str(args.input_file.absolute())} --model_prefix={prefix} --vocab_size={vocab_size} --pad_id=0 --unk_id=1 --eos_id=-1 --bos_id=-1 --control_symbols=[CLS],[SEP],[MASK] --user_defined_symbols=(,),',\",-,.,–,£,€,$,·,´ --shuffle_input_sentence=true --input_sentence_size=10000000 --character_coverage=0.99995 --model_type=unigram"
+    cmd = f"--num_threads={args.num_threads} --normalization_rule_name=nmt_nfkc{rule} --input={str(args.input_file.absolute())} --model_prefix={prefix} --vocab_size={vocab_size} --pad_id=0 --unk_id=1 --eos_id=-1 --bos_id=-1 --control_symbols=[CLS],[SEP],[MASK] --user_defined_symbols=(,),',\",-,.,–,£,€,$,·,´ --shuffle_input_sentence=true --input_sentence_size=5000000 --character_coverage=0.99995 --model_type=unigram"
 
     spm.SentencePieceTrainer.Train(cmd)
 

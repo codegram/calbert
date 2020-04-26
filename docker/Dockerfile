@@ -1,4 +1,5 @@
-FROM codegram/apex-pytorch1.4-cuda10.1:latest
+ARG IMAGE=codegram/apex-pytorch1.4-cuda10.1:latest
+FROM $IMAGE
 
 WORKDIR /workspace
 
