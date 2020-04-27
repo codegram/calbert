@@ -10,18 +10,16 @@ log = logging.getLogger(__name__)
 
 TASK_WITH_ARGS = (None, None)
 
-VALID_COMMANDS = ["train_tokenizer", "train_model", "dataset", "export"]
+VALID_COMMANDS = ["train_tokenizer", "train_model", "export"]
 
 TASKS = {
     "train_tokenizer": tokenizer.train,
     "train_model": training.train,
-    "dataset": dataset.process,
     "export": export.run,
 }
 PARSERS = {
     "train_tokenizer": tokenizer.arguments,
     "train_model": training.arguments,
-    "dataset": dataset.arguments,
     "export": export.arguments,
 }
 

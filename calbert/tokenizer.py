@@ -24,7 +24,7 @@ def arguments() -> argparse.ArgumentParser:
     return parser
 
 
-def train(args, cfg) -> str:
+def train(args, cfg) -> AlbertTokenizer:
     log.info(f"Training tokenizer: {args}")
 
     out_dir = normalize_path(args.out_dir)

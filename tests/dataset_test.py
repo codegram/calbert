@@ -1,100 +1,79 @@
-import logging
 import pytest
-import tempfile
-import glob
-import argparse
-from pathlib import Path
 
-from omegaconf import OmegaConf
+import random
 
-from calbert import dataset, utils
+from calbert.dataset import CalbertDataset, Tokenize, Mask, ignore, SentencePair
+from fastai2.data.all import DataLoader, TfmdDL, Datasets, Transform, stop
+from fastai2.text.data import TensorText
+from fastai2.basics import L
 
-from .tokenizer_test import train_tokenizer
+# from fastai2.text.all import *
 from .conftest import InputData, folder
+from .tokenizer_test import train_tokenizer
 
 
 @pytest.fixture(scope="module")
-def dataset_args_cfg():
+def dataset():
     with InputData("train") as train_file:
-        with InputData("valid") as valid_file:
-            with folder() as tokenizer_dir:
-                with folder() as dataset_dir:
-                    tokenizer, _ = train_tokenizer((train_file, tokenizer_dir))
-                    args = dataset.arguments().parse_args(
-                        [
-                            "--tokenizer-dir",
-                            tokenizer_dir,
-                            "--out-dir",
-                            dataset_dir,
-                            "--train-file",
-                            train_file,
-                            "--valid-file",
-                            valid_file,
-                        ]
-                    )
-                    config = [
-                        "training.max_seq_length=12",
-                        "data.processing_minibatch_size=2",
-                        "vocab.max_size=50",
-                        "vocab.lowercase=False",
-                    ]
-                    cfg = OmegaConf.from_dotlist(config)
-                    yield args, cfg, tokenizer
+        yield train_file
 
 
-@pytest.mark.describe("dataset.Dataset")
-class TestDataset:
-    @pytest.mark.it("Turns raw text into a dataset consumable with random access")
-    def test_process(self, dataset_args_cfg):
-        args, cfg, tokenizer = dataset_args_cfg
-        outdir = args.out_dir
-        dataset.process(args, cfg)
-        train_ds = dataset.CalbertDataset(
-            outdir,
-            split="train",
-            max_seq_length=cfg.training.max_seq_length,
-            max_vocab_size=cfg.vocab.max_size,
-        )
-        valid_ds = dataset.CalbertDataset(
-            outdir,
-            split="valid",
-            max_seq_length=cfg.training.max_seq_length,
-            max_vocab_size=cfg.vocab.max_size,
-        )
-        assert len(train_ds) == 3
-        assert len(valid_ds) == 1
+@pytest.fixture(scope="module")
+def tokenizer(which="train") -> (str, str):
+    with InputData(which) as train_file:
+        with folder() as outdir:
+            yield train_tokenizer((train_file, outdir))[0]
 
-        tensor = train_ds[0]
-        assert tensor.shape == (4, 12)
-        assert [example[0].tolist() for example in train_ds] == [
-            [4, 39, 12, 27, 30, 32, 3, 39, 10, 5, 14, 3],
-            [4, 39, 9, 14, 25, 36, 3, 39, 13, 18, 26, 3],
-            [4, 39, 13, 18, 26, 31, 3, 39, 12, 18, 30, 3],
-        ]
-        assert [tokenizer.decode(example[0].tolist()) for example in train_ds] == [
-            "Port D'a",
-            "Camí Sen",
-            "Sens Per",
-        ]
 
-    @pytest.mark.it("Loads only a subset of the data, with a minimum of 1 row")
-    def test_subset(self, dataset_args_cfg):
-        args, cfg, tokenizer = dataset_args_cfg
-        outdir = args.out_dir
-        dataset.process(args, cfg)
-        train_ds = dataset.CalbertDataset(
-            outdir,
-            split="train",
-            max_seq_length=cfg.training.max_seq_length,
-            max_vocab_size=cfg.vocab.max_size,
-            subset=0.5,
+@pytest.mark.describe("dataset.CalbertDataset")
+class TestCalbertDataset:
+    @pytest.mark.it("Returns pairs of sentences")
+    def test_iter(self, dataset):
+        ds = iter(CalbertDataset(dataset))
+        assert next(ds) == SentencePair(
+            "Porto posat l'esquinç al peu sense sutura marejant metges i perdius i això no es cura.",
+            "D'altra banda tampoc he anat al metge.",
         )
-        valid_ds = dataset.CalbertDataset(
-            outdir,
-            split="valid",
-            max_seq_length=cfg.training.max_seq_length,
-            max_vocab_size=cfg.vocab.max_size,
-            subset=0.5,
+        assert next(ds) == SentencePair(
+            "Camí de massa ampla tessitura estintolada, encara sobre la corda insegura.",
+            "Sens dubte.",
         )
-        assert len(train_ds) == 1
-        assert len(valid_ds) == 1
+
+    @pytest.mark.it("Returns pairs of sentences up to a limit")
+    def test_iter_with_max_items(self, dataset):
+        ds = iter(CalbertDataset(dataset, max_items=1))
+        assert next(ds) == SentencePair(
+            "Porto posat l'esquinç al peu sense sutura marejant metges i perdius i això no es cura.",
+            "D'altra banda tampoc he anat al metge.",
+        )
+        try:
+            next(ds)
+            assert False
+        except StopIteration:
+            assert True
+
+
+@pytest.mark.describe("dataset.Tokenization")
+class TestTokenization:
+    @pytest.mark.it("Returns tokenized pairs of sentences")
+    def test_tokenize(self, dataset, tokenizer):
+        ds = CalbertDataset(dataset)
+        tfms = [Tokenize(tokenizer, max_seq_len=12)]
+        train_ds = Datasets(ds, tfms=tfms)
+
+        encoded = next(iter(train_ds))[0][0]
+        assert train_ds.decode([TensorText(encoded)]) == ("port d'a",)
+
+
+@pytest.mark.describe("dataset.Mask")
+class TestMask:
+    @pytest.mark.it("Masks tokens with a probability")
+    def test_mask(self, dataset, tokenizer):
+        ds = CalbertDataset(dataset)
+        tfms = [Tokenize(tokenizer, max_seq_len=12), Mask(tokenizer, probability=1.0)]
+        train_ds = Datasets(ds, tfms=[tfms, [ignore]])
+
+        inputs, other = next(iter(train_ds))
+
+        assert inputs[0].size(0) == 12
+        assert tokenizer.mask_token_id in inputs[0]

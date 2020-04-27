@@ -18,3 +18,4 @@ model/
 testy.py
 models/
 *.egg-info
+*.log

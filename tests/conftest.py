@@ -9,7 +9,10 @@ training_text = [
     "Camí de massa ampla tessitura estintolada, encara sobre la corda insegura. Sens dubte. Per tant, res.",
 ]
 
-validation_text = ["La corda insegura s'ha cuit malament. L'haurem de tornar a coure."]
+validation_text = [
+    "La corda insegura s'ha cuit malament. L'haurem de tornar a coure.",
+    "De fet no sabien que plouria. Malgrat tot havien portat xubasquero.",
+]
 
 
 class InputData:

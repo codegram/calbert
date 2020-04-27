@@ -7,7 +7,6 @@ data:
 
 vocab:
   max_size: 30000
-  min_frequency: 2
   lowercase: True
 
 seed: 42

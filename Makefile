@@ -4,15 +4,13 @@ deps: pyproject.toml
 docker: 
 	cp pyproject.toml docker
 	cp poetry.lock docker
-	docker build -t codegram/calbert ./docker
-
-docker-cpu: 
-	cp pyproject.toml docker
-	cp poetry.lock docker
-	docker build -t codegram/calbert:cpu --build-arg IMAGE=ufoym/deepo:torch-cpu ./docker
+	docker build -t codegram/calbert -t codegram/calbert:gpu -f docker/Dockerfile.gpu ./docker
+	docker build -t codegram/calbert:cpu -f docker/Dockerfile.cpu ./docker
 
 docker-push:
 	docker push codegram/calbert:latest
+	docker push codegram/calbert:gpu
+	docker push codegram/calbert:cpu
 
 test:
 	poetry run py.test tests
