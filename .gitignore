@@ -1,14 +1,9 @@
 .venv
 __pycache__
 .vscode/.ropeproject/objectdb
-out
-outputs
-*.model
-*.vocab
 run/
 runs/
 *.txt
-tokenizer/
 docker/pyproject.toml
 docker/poetry.lock
 wandb/
