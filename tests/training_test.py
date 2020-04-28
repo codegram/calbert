@@ -33,14 +33,18 @@ def training_args_cfg():
                         "--valid-path",
                         str(valid_file),
                         "--train-batch-size",
-                        "2",
+                        "1",
                         "--eval-batch-size",
-                        "2",
+                        "1",
+                        "--epochs",
+                        "1",
+                        "--max-items",
+                        "1",
                     ]
                 )
 
                 training_config = [
-                    "training.max_seq_length=12",
+                    "training.max_seq_length=4",
                     "training.masked_lm_prob=0.1",
                     "training.weight_decay=0.0",
                     "training.learning_rate=5e-05",
@@ -68,7 +72,7 @@ class TestTraining:
         tokenize = Tokenize(tok, max_seq_len=cfg.training.max_seq_length)
 
         (token_ids, attention_mask, type_ids) = tokenize(
-            SentencePair("Hola com anem?", "Molt bé i tu?")
+            SentencePair("Hola com anem?", "Molt bé i tu?"),
         )
 
         masked_token_ids, labels = mask_tokens(
