@@ -26,6 +26,7 @@ from transformers.modeling_albert import AlbertMLMHead
 
 from calbert.reporting import DeepkitCallback
 from calbert.dataset import CalbertDataset, Tokenize, dataloaders as build_dataloaders
+from calbert.model import CalbertForMaskedLM
 from calbert.tokenizer import AlbertTokenizer, load as load_tokenizer
 from calbert.utils import normalize_path
 
@@ -107,45 +108,6 @@ def arguments() -> argparse.ArgumentParser:
     return parser
 
 
-class CalbertForMaskedLM(AlbertForMaskedLM):
-    def __init__(self, config):
-        super().__init__(config)
-
-    def forward(self, input):
-        input_ids, masked_lm_labels, attention_mask, token_type_ids = input.permute(
-            1, 0, 2
-        )
-
-        position_ids = None
-        head_mask = None
-        inputs_embeds = None
-
-        outputs = self.albert(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-        )
-        sequence_outputs = outputs[0]
-
-        prediction_scores = self.predictions(sequence_outputs)
-
-        outputs = (prediction_scores,) + outputs[
-            2:
-        ]  # Add hidden states and attention if they are here
-        if masked_lm_labels is not None:
-            loss_fct = torch.nn.CrossEntropyLoss()
-            masked_lm_loss = loss_fct(
-                prediction_scores.view(-1, self.config.vocab_size),
-                masked_lm_labels.reshape(-1),
-            )
-            outputs = (masked_lm_loss,) + outputs
-
-        return outputs[0]  # return only loss
-
-
 def albert_config(cfg, args) -> AlbertConfig:
     model_name = (
         f"calbert-{cfg.model.name}-{'uncased' if cfg.vocab.lowercase else 'cased'}"
@@ -192,7 +154,7 @@ def get_learner(
     learner = Learner(
         dataloaders,
         model,
-        loss_func=lambda loss, _: loss,
+        loss_func=lambda out, _: out[0],
         opt_func=partial(Lamb, lr=0.1, wd=cfg.training.weight_decay),
         metrics=[Perplexity()],
     )
@@ -200,7 +162,7 @@ def get_learner(
     if args.distributed:
         setup_distrib(args.local_rank)
         cbs.append(FixedDistributedTrainer(args.local_rank))
-    cbs.extend([DeepkitCallback(args, cfg)])
+    cbs.extend([DeepkitCallback(args, cfg, tokenizer)])
     learner.add_cbs(cbs)
     if args.distributed and rank_distrib() > 0:
         learner.remove_cb(learner.progress)

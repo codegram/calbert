@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 
 from calbert import dataset, training, tokenizer
 from calbert.dataset import Tokenize, SentencePair, mask_tokens
+from calbert.model import CalbertForMaskedLM
 from transformers import AlbertForMaskedLM
 
 from .tokenizer_test import train_tokenizer
@@ -90,7 +91,7 @@ class TestTraining:
 
         assert predictions.shape == (cfg.training.max_seq_length, len(tok))
 
-        model.__class__ = training.CalbertForMaskedLM
+        model.__class__ = model.CalbertForMaskedLM
 
         learn.validate()
 

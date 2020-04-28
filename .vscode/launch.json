@@ -1,0 +1,29 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Module",
+      "type": "python",
+      "request": "launch",
+      "module": "calbert",
+      "args": [
+        "train",
+        "--tokenizer-path",
+        "dist/tokenizer-uncased/ca.uncased.30000.model",
+        "--train-path",
+        "dist/data/train_subset.txt",
+        "--valid-path",
+        "dist/data/valid_subset.txt",
+        "--train-batch-size",
+        "4",
+        "--eval-batch-size",
+        "2",
+        "--max-items",
+        "10"
+      ]
+    }
+  ]
+}

@@ -55,7 +55,6 @@ class TestTokenizer:
         t, outdir = train_tokenizer(input_file_and_outdir)
 
         tokens = t.tokenize("Hola, com anem? Tot bé?")
-        print(tokens)
         assert tokens == [
             "▁",
             "h",
