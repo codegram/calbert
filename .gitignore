@@ -14,3 +14,4 @@ testy.py
 models/
 *.egg-info
 *.log
+export/

@@ -140,9 +140,9 @@ class Mask(Transform):
         return torch.stack([masked_ids, labels, attention_masks, token_type_ids])
 
 
-@Transform
-def ignore(x):
-    return 0
+class Ignore(Transform):
+    def encodes(self, x):
+        return 0
 
 
 def dataloaders(
@@ -153,8 +153,8 @@ def dataloaders(
         Mask(tok=tokenizer, probability=cfg.training.masked_lm_prob),
     ]
 
-    train_ds = Datasets(tds, tfms=[tfms, [ignore]])
-    valid_ds = Datasets(vds, tfms=[tfms, [ignore]])
+    train_ds = Datasets(tds, tfms=[tfms, [Ignore()]])
+    valid_ds = Datasets(vds, tfms=[tfms, [Ignore()]])
 
     return DataLoaders(
         TfmdDL(

@@ -2,7 +2,7 @@ import pytest
 
 import random
 
-from calbert.dataset import CalbertDataset, Tokenize, Mask, ignore, SentencePair
+from calbert.dataset import CalbertDataset, Tokenize, Mask, Ignore, SentencePair
 from fastai2.data.all import DataLoader, TfmdDL, Datasets, Transform, stop
 from fastai2.text.data import TensorText
 from fastai2.basics import L
@@ -71,7 +71,7 @@ class TestMask:
     def test_mask(self, dataset, tokenizer):
         ds = CalbertDataset(dataset)
         tfms = [Tokenize(tokenizer, max_seq_len=12), Mask(tokenizer, probability=1.0)]
-        train_ds = Datasets(ds, tfms=[tfms, [ignore]])
+        train_ds = Datasets(ds, tfms=[tfms, [Ignore()]])
 
         inputs, other = next(iter(train_ds))
 

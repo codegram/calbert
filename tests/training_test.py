@@ -22,50 +22,46 @@ def training_args_cfg():
     with InputData("train") as train_file:
         with InputData("valid") as valid_file:
             with folder() as tokenizer_dir:
-                with folder() as model_dir:
-                    tok, prefix = train_tokenizer((train_file, tokenizer_dir))
+                tok, prefix = train_tokenizer((train_file, tokenizer_dir))
 
-                    training_args = training.arguments().parse_args(
-                        [
-                            "--tokenizer-path",
-                            f"{prefix}.model",
-                            "--out-dir",
-                            model_dir,
-                            "--train-path",
-                            str(train_file),
-                            "--valid-path",
-                            str(valid_file),
-                            "--train-batch-size",
-                            "2",
-                            "--eval-batch-size",
-                            "2",
-                        ]
-                    )
-
-                    training_config = [
-                        "training.max_seq_length=12",
-                        "training.masked_lm_prob=0.1",
-                        "training.epochs=1",
-                        "training.weight_decay=0.0",
-                        "training.learning_rate=5e-05",
-                        "seed=42",
-                        "model.name=test",
-                        "vocab.lowercase=False",
-                        "vocab.max_size=10",
+                training_args = training.arguments().parse_args(
+                    [
+                        "--tokenizer-path",
+                        f"{prefix}.model",
+                        "--train-path",
+                        str(train_file),
+                        "--valid-path",
+                        str(valid_file),
+                        "--train-batch-size",
+                        "2",
+                        "--eval-batch-size",
+                        "2",
                     ]
+                )
 
-                    training_cfg = OmegaConf.from_dotlist(training_config)
+                training_config = [
+                    "training.max_seq_length=12",
+                    "training.masked_lm_prob=0.1",
+                    "training.weight_decay=0.0",
+                    "training.learning_rate=5e-05",
+                    "seed=42",
+                    "model.name=test",
+                    "vocab.lowercase=False",
+                    "vocab.max_size=10",
+                ]
 
-                    yield training_args, training_cfg, model_dir, tok
+                training_cfg = OmegaConf.from_dotlist(training_config)
+
+                yield training_args, training_cfg, tok
 
 
 @pytest.mark.describe("training.train")
 class TestTraining:
     @pytest.mark.it("Trains the model")
     def test_process(self, training_args_cfg):
-        args, cfg, model_path, tok = training_args_cfg
+        args, cfg, tok = training_args_cfg
 
-        learn = training.train(args, cfg)
+        learn = training.train(args, cfg, test_mode=True)
 
         model = learn.model
 

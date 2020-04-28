@@ -1,9 +1,11 @@
 from pathlib import Path
+from collections import ChainMap
 from typing import Tuple, List
 import argparse
 import logging
 from functools import partial
 
+import deepkit
 import torch
 import torch.nn as nn
 from fastai2.basics import Learner, Transform, rank_distrib, random, noop, to_device
@@ -19,11 +21,10 @@ from torch.nn.parallel import DistributedDataParallel
 from transformers import (
     AlbertConfig,
     AlbertForMaskedLM,
-    AlbertPreTrainedModel,
-    AlbertModel,
 )
 from transformers.modeling_albert import AlbertMLMHead
 
+from calbert.reporting import DeepkitCallback
 from calbert.dataset import CalbertDataset, Tokenize, dataloaders as build_dataloaders
 from calbert.tokenizer import AlbertTokenizer, load as load_tokenizer
 from calbert.utils import normalize_path
@@ -62,11 +63,10 @@ def arguments() -> argparse.ArgumentParser:
         "--valid-path", required=True, type=Path, help="Where the valid.txt file lives",
     )
     parser.add_argument(
-        "--out-dir",
+        "--export-path",
         default=None,
         type=Path,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help="The optional output directory where to save the model in HuggingFace format",
     )
 
     parser.add_argument(
@@ -80,6 +80,9 @@ def arguments() -> argparse.ArgumentParser:
         default=128,
         type=int,
         help="Batch size across all GPUs/CPUs for evaluation.",
+    )
+    parser.add_argument(
+        "--epochs", default=1, type=int, help="Number of epochs to train",
     )
 
     parser.add_argument(
@@ -182,7 +185,6 @@ def dataloaders(
 def get_learner(
     args,
     cfg,
-    model_path: Path,
     dataloaders: DataLoaders,
     model: CalbertForMaskedLM,
     tokenizer: AlbertTokenizer,
@@ -193,26 +195,44 @@ def get_learner(
         loss_func=lambda loss, _: loss,
         opt_func=partial(Lamb, lr=0.1, wd=cfg.training.weight_decay),
         metrics=[Perplexity()],
-        cbs=[],
     )
-    learner.model_path = model_path
     cbs = []
     if args.distributed:
         setup_distrib(args.local_rank)
         cbs.append(FixedDistributedTrainer(args.local_rank))
-    cbs.extend(
-        [
-            SaveModelCallback(every_epoch=True),
-            ReduceLROnPlateau(monitor="valid_loss", min_delta=0.1, patience=2),
-        ]
-    )
+    cbs.extend([DeepkitCallback(args, cfg)])
     learner.add_cbs(cbs)
     if args.distributed and rank_distrib() > 0:
         learner.remove_cb(learner.progress)
     return learner
 
 
-def train(args, cfg) -> Learner:
+def set_config(experiment, key, val):
+    if key not in ["_resolver_cache", "content", "flags"] and val is not None:
+        if isinstance(val, int) or isinstance(val, float):
+            experiment.set_config(key, val)
+        else:
+            experiment.set_config(key, str(val))
+
+
+def train(args, cfg, test_mode=False) -> Learner:
+    experiment = deepkit.experiment()
+    if test_mode:
+        experiment.set_title("Unit test")
+        experiment.set_info("test", True)
+
+    for key, val in vars(args).items():
+        set_config(experiment, key, val)
+
+    for key, val in dict(cfg.vocab).items():
+        set_config(experiment, f"vocab.{key}", val)
+    for key, val in dict(cfg.training).items():
+        set_config(experiment, f"training.{key}", val)
+    for key, val in dict(cfg.model).items():
+        set_config(experiment, f"model.{key}", val)
+
+    args.experiment = experiment
+
     args.distributed = args.local_rank != -1
     args.main_process = args.local_rank in [-1, 0]
 
@@ -227,8 +247,6 @@ def train(args, cfg) -> Learner:
     args.tokenizer_path = normalize_path(args.tokenizer_path)
     args.train_path = normalize_path(args.train_path)
     args.valid_path = normalize_path(args.valid_path)
-    args.out_dir = normalize_path(args.out_dir)
-    args.out_dir.mkdir(parents=True, exist_ok=True)
 
     tokenizer = load_tokenizer(cfg, args.tokenizer_path)
     model = initialize_model(cfg, args, tokenizer=tokenizer)
@@ -239,14 +257,7 @@ def train(args, cfg) -> Learner:
         args, cfg, device=device, tokenizer=tokenizer, max_items=args.max_items
     )
 
-    learn = get_learner(
-        args,
-        cfg,
-        model_path=args.out_dir,
-        dataloaders=dls,
-        model=model,
-        tokenizer=tokenizer,
-    )
+    learn = get_learner(args, cfg, dataloaders=dls, model=model, tokenizer=tokenizer,)
 
     if args.fp16:
         learn = learn.to_fp16()
@@ -270,11 +281,19 @@ def train(args, cfg) -> Learner:
             args.fp16,
         )
 
-    with learn.no_bar():
-        learn.fit_one_cycle(cfg.training.epochs, lr_max=cfg.training.learning_rate)
+    learn.fit_one_cycle(args.epochs, lr_max=cfg.training.learning_rate)
 
     learn.model.eval()
 
-    learn.save("final")
+    if args.export_path:
+        args.export_path = normalize_path(args.export_path)
+        args.export_path.mkdir(parents=True, exist_ok=True)
+        model_to_save = model.module if hasattr(model, "module") else model
+        model_to_save.__class__ = AlbertForMaskedLM
+        torch.save(model_to_save.state_dict(), args.export_path / "pytorch_model.bin")
+        model_to_save.config.to_json_file(args.export_path / "config.json")
+        tokenizer.save_pretrained(args.export_path)
+        for file in args.export_path.glob("*"):
+            args.experiment.add_output_file(str(file))
 
     return learn
