@@ -1,5 +1,6 @@
 import deepkit
 import torch
+import math
 
 from fastai2.basics import Recorder, Callback, random, rank_distrib, num_distrib
 from calbert.tokenizer import AlbertTokenizer
@@ -17,10 +18,11 @@ class DeepkitCallback(Callback):
         self.experiment: deepkit.Experiment = args.experiment
         self.tokenizer = tokenizer
         self.total_examples = args.max_items or 19557475
-        self.log_every_batches = self.total_examples / 200 / self.args.train_batch_size
-        self.total_batches = int(self.total_examples / self.args.train_batch_size)
+        self.log_every_batches = math.ceil(
+            self.total_examples / 200 / self.args.train_batch_size
+        )
+        self.total_batches = math.ceil(self.total_examples / self.args.train_batch_size)
         self.n_preds = 4
-        self.batch = -1
 
     def begin_fit(self):
         # FIXME: look into why it doesn't work
@@ -33,26 +35,26 @@ class DeepkitCallback(Callback):
         )
 
     def begin_epoch(self):
+        self.batch = 0
         self.experiment.iteration(self.epoch, total=self.args.epochs)
-
-    def begin_train(self):
-        pass
-
-    def begin_validate(self):
-        pass
-
-    def after_train(self):
-        pass
 
     def after_validate(self):
         self._write_stats()
 
+    def begin_batch(self):
+        pass
+
     def after_batch(self):
+        if not self.learn.training:
+            return
+
         self.batch += 1
         self.experiment.log_metric("train_loss", self.smooth_loss)
         self.experiment.log_metric("raw_loss", self.loss)
         self.experiment.batch(
-            self.batch, size=self.args.train_batch_size, total=self.total_batches,
+            self.learn.train_iter,
+            size=self.args.train_batch_size,
+            total=self.total_batches,
         )
         if self.batch % self.log_every_batches == 0:  # log some insights
             b, _ = self.valid_dl.one_batch()
@@ -76,6 +78,8 @@ class DeepkitCallback(Callback):
                 ]
 
                 _, prediction_scores = model(b)
+                if prediction_scores.size(0) == 0:
+                    return  # weird bug?
                 predicteds = [
                     self.tokenizer.convert_ids_to_tokens(
                         torch.argmax(pscore[filt[i]], dim=1), skip_special_tokens=False
@@ -93,6 +97,7 @@ class DeepkitCallback(Callback):
                 model.__class__ = kls
 
     def after_epoch(self):
+        self.experiment.iteration(self.epoch + 1, total=self.args.epochs)
         name = f"model_{self.epoch}"
         self.learn.save(name)
         self.experiment.add_output_file(str(self.learn.path / "models" / f"{name}.pth"))
