@@ -1,9 +1,5 @@
 data:
-  dedup: True
-  subset: False
-  subset_size: 22000
   valid_split: 0.04
-  processing_minibatch_size: 10000
 
 vocab:
   max_size: 30000

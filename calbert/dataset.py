@@ -4,7 +4,7 @@ import itertools
 import re
 
 import torch
-from fastai2.basics import Transform, to_device
+from fastai2.basics import Transform, to_device, default_device
 from fastai2.text.data import TensorText
 from fastai2.data.core import TfmdDL, DataLoaders, Datasets
 from torch.utils.data import Dataset, TensorDataset, IterableDataset, DataLoader
@@ -15,12 +15,6 @@ from collections import namedtuple
 SentencePair = namedtuple("SentencePair", ["first", "second"])
 
 IGNORE_INDEX = -100  # Pytorch CrossEntropyLoss defaults to ignoring -100
-
-
-def chunk(iterable, n, fillvalue=None):
-    "Collect data into fixed-length chunks or blocks"
-    # chunk('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
-    yield from itertools.zip_longest(*[iter(iterable)] * n, fillvalue=fillvalue)
 
 
 punctuation = re.compile(r"[\.!\?]+")
@@ -146,7 +140,7 @@ class Ignore(Transform):
 
 
 def dataloaders(
-    args, cfg, tokenizer: AlbertTokenizer, tds: CalbertDataset, vds: CalbertDataset
+    args, cfg, tokenizer: AlbertTokenizer, tds: CalbertDataset, vds: CalbertDataset,
 ) -> DataLoaders:
     tfms = [
         Tokenize(tokenizer, max_seq_len=cfg.training.max_seq_length),
@@ -161,12 +155,12 @@ def dataloaders(
             train_ds,
             batch_size=args.train_batch_size,
             num_workers=0,
-            after_batch=to_device,
+            device=default_device(),
         ),
         TfmdDL(
             valid_ds,
             batch_size=args.eval_batch_size,
             num_workers=0,
-            after_batch=to_device,
+            device=default_device(),
         ),
     )

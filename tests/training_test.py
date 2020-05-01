@@ -8,6 +8,7 @@ import pytest
 from pathlib import Path
 
 from omegaconf import OmegaConf
+import torch
 
 from calbert import dataset, training, tokenizer
 from calbert.dataset import Tokenize, SentencePair, mask_tokens

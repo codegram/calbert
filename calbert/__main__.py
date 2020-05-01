@@ -4,21 +4,23 @@ import sys
 import argparse
 from pathlib import Path
 
-from . import tokenizer, training
+from . import tokenizer, training, download_data
 
 log = logging.getLogger(__name__)
 
 TASK_WITH_ARGS = (None, None)
 
-VALID_COMMANDS = ["tokenizer", "train"]
+VALID_COMMANDS = ["tokenizer", "train", "download_data"]
 
 TASKS = {
     "tokenizer": tokenizer.train,
     "train": training.train,
+    "download_data": download_data.run,
 }
 PARSERS = {
     "tokenizer": tokenizer.arguments,
     "train": training.arguments,
+    "download_data": download_data.arguments,
 }
 
 
@@ -38,7 +40,6 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    print(sys.argv)
     if len(sys.argv) < 2:
         log.error(f"Must provide valid command: {', '.join(VALID_COMMANDS)}")
         exit(-1)

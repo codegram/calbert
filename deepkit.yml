@@ -1,0 +1,28 @@
+image: codegram/calbert:latest
+
+docker:
+  binds:
+    - "~/data:/data"
+
+files:
+  - config
+  - calbert
+  - dist
+
+output:
+  - run
+  - export
+  - models
+
+config:
+  version: tiny
+  train_batch_size: 56
+  eval_batch_size: 96
+
+tasks:
+  download_data:
+    command: python -m calbert download_data --out-dir /data/calbert
+
+  train:
+    command: ls /data/calbert && python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path /data/calbert/train.txt --valid-path /data/calbert/valid.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --fp16 --export-path export model={{version}}
+    depends_on: [download_data]

@@ -1,10 +1,13 @@
 import deepkit
 import torch
 import math
+import logging
 
 from fastai2.basics import Recorder, Callback, random, rank_distrib, num_distrib
 from calbert.tokenizer import AlbertTokenizer
 from calbert.model import CalbertForMaskedLM
+
+log = logging.getLogger(__name__)
 
 
 class DeepkitCallback(Callback):
@@ -38,12 +41,6 @@ class DeepkitCallback(Callback):
         self.batch = 0
         self.experiment.iteration(self.epoch, total=self.args.epochs)
 
-    def after_validate(self):
-        self._write_stats()
-
-    def begin_batch(self):
-        pass
-
     def after_batch(self):
         if not self.learn.training:
             return
@@ -67,34 +64,43 @@ class DeepkitCallback(Callback):
                 kls = model.__class__
                 model.__class__ = CalbertForMaskedLM
 
-                sources = [self.tokenizer.decode(x[0]).replace("<pad>", "") for x in b]
-                masks = b[:, 1]
-                filt = masks != -100
-                labels = [
-                    self.tokenizer.convert_ids_to_tokens(
-                        masks[idx][filt[idx]], skip_special_tokens=False
-                    )
-                    for idx, f in enumerate(filt)
-                ]
+                try:
+                    sources = [
+                        self.tokenizer.decode(x[0]).replace("<pad>", "") for x in b
+                    ]
+                    masks = b[:, 1]
+                    filt = masks != -100
+                    labels = [
+                        self.tokenizer.convert_ids_to_tokens(
+                            masks[idx][filt[idx]], skip_special_tokens=False
+                        )
+                        for idx, f in enumerate(filt)
+                    ]
 
-                _, prediction_scores = model(b)
-                if prediction_scores.size(0) == 0:
-                    return  # weird bug?
-                predicteds = [
-                    self.tokenizer.convert_ids_to_tokens(
-                        torch.argmax(pscore[filt[i]], dim=1), skip_special_tokens=False
-                    )
-                    for i, pscore in enumerate(prediction_scores)
-                ]
-                insight = [
-                    {
-                        "text": source,
-                        "correct+predicted": list(zip(labels[idx], predicteds[idx])),
-                    }
-                    for idx, source in enumerate(sources)
-                ]
-                self.experiment.log_insight(insight, name="predictions")
-                model.__class__ = kls
+                    _, prediction_scores = model(b)
+                    if prediction_scores.size(0) == 0:
+                        return  # weird bug?
+                    predicteds = [
+                        self.tokenizer.convert_ids_to_tokens(
+                            torch.argmax(pscore[filt[i]], dim=1),
+                            skip_special_tokens=False,
+                        )
+                        for i, pscore in enumerate(prediction_scores)
+                    ]
+                    insight = [
+                        {
+                            "text": source,
+                            "correct+predicted": list(
+                                zip(labels[idx], predicteds[idx])
+                            ),
+                        }
+                        for idx, source in enumerate(sources)
+                    ]
+                    self.experiment.log_insight(insight, name="predictions")
+                except Exception as e:
+                    log.error("Error during reporting: {e}")
+                finally:
+                    model.__class__ = kls
 
     def after_epoch(self):
         self.experiment.iteration(self.epoch + 1, total=self.args.epochs)

@@ -8,7 +8,15 @@ from functools import partial
 import deepkit
 import torch
 import torch.nn as nn
-from fastai2.basics import Learner, Transform, rank_distrib, random, noop, to_device
+from fastai2.basics import (
+    Learner,
+    Transform,
+    rank_distrib,
+    random,
+    noop,
+    to_device,
+    default_device,
+)
 from fastai2.callback import progress, schedule, fp16
 from fastai2.callback.all import SaveModelCallback, ReduceLROnPlateau
 from fastai2.metrics import accuracy, Perplexity
@@ -94,9 +102,7 @@ def arguments() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--fp16",
-        action="store_true",
-        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit",
+        "--fp16", action="store_true", help="Whether to use 16-bit (mixed) precision",
     )
 
     parser.add_argument(
@@ -124,20 +130,10 @@ def initialize_model(cfg, args, tokenizer: AlbertTokenizer) -> CalbertForMaskedL
         model.module if hasattr(model, "module") else model
     )  # Take care of distributed/parallel training
     model_to_resize.resize_token_embeddings(len(tokenizer))
-    to_device(model)
-    return model
+    return to_device(model, default_device())
 
 
-def get_device(args) -> torch.device:
-    if args.local_rank == -1:
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    else:
-        return torch.device("cuda", args.local_rank)
-
-
-def dataloaders(
-    args, cfg, device: torch.device, tokenizer: AlbertTokenizer, max_items=None
-) -> DataLoaders:
+def dataloaders(args, cfg, tokenizer: AlbertTokenizer, max_items=None) -> DataLoaders:
     train_ds = CalbertDataset(args.train_path, max_items=max_items,)
     valid_ds = CalbertDataset(args.valid_path, max_items=max_items,)
 
@@ -211,13 +207,11 @@ def train(args, cfg, test_mode=False) -> Learner:
     args.valid_path = normalize_path(args.valid_path)
 
     tokenizer = load_tokenizer(cfg, args.tokenizer_path)
+
     model = initialize_model(cfg, args, tokenizer=tokenizer)
 
-    device = get_device(args)
-
-    dls = dataloaders(
-        args, cfg, device=device, tokenizer=tokenizer, max_items=args.max_items
-    )
+    dls = dataloaders(args, cfg, tokenizer=tokenizer, max_items=args.max_items)
+    dls.to(default_device())
 
     learn = get_learner(args, cfg, dataloaders=dls, model=model, tokenizer=tokenizer,)
 
@@ -232,6 +226,8 @@ def train(args, cfg, test_mode=False) -> Learner:
     if args.main_process:
         log.info(f"Pretraining ALBERT: {args}")
         log.info(f"Configuration: {cfg.pretty()}")
+        log.info(f"Model device is {model.device}, loader device is {dls[0].device}")
+
         if args.max_items:
             log.info(f"Sentence pairs limited to {args.max_items}")
         else:
