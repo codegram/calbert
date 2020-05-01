@@ -122,6 +122,7 @@ def get_learner(
     dataloaders: DataLoaders,
     model: CalbertForMaskedLM,
     tokenizer: AlbertTokenizer,
+    test_mode=False,
 ) -> Learner:
     learner = Learner(
         dataloaders,
@@ -131,7 +132,8 @@ def get_learner(
         metrics=[Perplexity()],
     )
     cbs = []
-    cbs.extend([DeepkitCallback(args, cfg, tokenizer)])
+    if not test_mode:
+        cbs.extend([DeepkitCallback(args, cfg, tokenizer)])
     learner.add_cbs(cbs)
     return learner
 
@@ -145,22 +147,20 @@ def set_config(experiment, key, val):
 
 
 def train(args, cfg, test_mode=False) -> Learner:
-    experiment = deepkit.experiment()
-    if test_mode:
-        experiment.set_title("Unit test")
-        experiment.set_info("test", True)
+    if not test_mode:
+        experiment = deepkit.experiment()
 
-    for key, val in vars(args).items():
-        set_config(experiment, key, val)
+        for key, val in vars(args).items():
+            set_config(experiment, key, val)
 
-    for key, val in dict(cfg.vocab).items():
-        set_config(experiment, f"vocab.{key}", val)
-    for key, val in dict(cfg.training).items():
-        set_config(experiment, f"training.{key}", val)
-    for key, val in dict(cfg.model).items():
-        set_config(experiment, f"model.{key}", val)
+        for key, val in dict(cfg.vocab).items():
+            set_config(experiment, f"vocab.{key}", val)
+        for key, val in dict(cfg.training).items():
+            set_config(experiment, f"training.{key}", val)
+        for key, val in dict(cfg.model).items():
+            set_config(experiment, f"model.{key}", val)
 
-    args.experiment = experiment
+        args.experiment = experiment
 
     run_tags = [
         cfg.model.name,
@@ -181,7 +181,14 @@ def train(args, cfg, test_mode=False) -> Learner:
     dls = dataloaders(args, cfg, tokenizer=tokenizer, max_items=args.max_items)
     dls.to(default_device())
 
-    learn = get_learner(args, cfg, dataloaders=dls, model=model, tokenizer=tokenizer,)
+    learn = get_learner(
+        args,
+        cfg,
+        dataloaders=dls,
+        model=model,
+        tokenizer=tokenizer,
+        test_mode=test_mode,
+    )
 
     if args.fp16:
         learn = learn.to_fp16()
@@ -208,7 +215,7 @@ def train(args, cfg, test_mode=False) -> Learner:
 
     learn.model.eval()
 
-    if args.export_path:
+    if args.export_path and not test_mode:
         args.export_path = normalize_path(args.export_path)
         args.export_path.mkdir(parents=True, exist_ok=True)
         model_to_save = model.module if hasattr(model, "module") else model
