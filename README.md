@@ -50,7 +50,6 @@ Because there are no language models in Catalan! And there's a lot of Catalan te
 
 For dependency management we use [Poetry](https://python-poetry.org) (and Docker of course).
 
-
 ```bash
 pip install -U poetry
 poetry install
@@ -105,14 +104,12 @@ deepkit run test.deepkit.yml
 
 By default it will train it in your local Deepkit instance, using your CPU. Read [their docs](https://deepkit.ai/documentation/getting-started) to learn how to customize your runs.
 
-### Training on multiple GPUs in a cluster
+### Training on a cluster
 
-(TODO)
-
-Adjust how many GPUs you have and make sure to tune your batch size in `launch.py`.
+Configure a cluster in your local Deepkit with at least one machine with a GPU.
 
 ```bash
-python -m torch.distributed.launch --nproc_per_node=NUM_GPUS launch.py
+deepkit run --cluster
 ```
 
 ### Sharing the model with the world

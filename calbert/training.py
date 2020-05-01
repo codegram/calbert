@@ -11,7 +11,6 @@ import torch.nn as nn
 from fastai2.basics import (
     Learner,
     Transform,
-    rank_distrib,
     random,
     noop,
     to_device,
@@ -23,8 +22,6 @@ from fastai2.metrics import accuracy, Perplexity
 from fastai2.data.core import TfmdDL, DataLoaders, Datasets
 from fastai2.text.data import TensorText
 from fastai2.optimizer import Lamb
-from fastai2.distributed import setup_distrib, DistributedDL, DistributedTrainer
-from torch.nn.parallel import DistributedDataParallel
 
 from transformers import (
     AlbertConfig,
@@ -41,20 +38,6 @@ from calbert.utils import normalize_path
 log = logging.getLogger(__name__)
 
 IGNORE_INDEX = -100  # Pytorch CrossEntropyLoss defaults to ignoring -100
-
-
-class FixedDistributedTrainer(DistributedTrainer):
-    def begin_fit(self):
-        self.learn.model = DistributedDataParallel(
-            self.model,
-            device_ids=[self.cuda_id],
-            output_device=self.cuda_id,
-            find_unused_parameters=True,
-        )
-        self.old_dls = list(self.dls)
-        self.learn.dls.loaders = [self._wrap_dl(dl) for dl in self.dls]
-        if rank_distrib() > 0:
-            self.learn.logger = noop
 
 
 def arguments() -> argparse.ArgumentParser:
@@ -104,13 +87,6 @@ def arguments() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fp16", action="store_true", help="Whether to use 16-bit (mixed) precision",
     )
-
-    parser.add_argument(
-        "--local-rank",
-        type=int,
-        default=-1,
-        help="Node number -- set by Pytorch in distributed training",
-    )
     return parser
 
 
@@ -155,13 +131,8 @@ def get_learner(
         metrics=[Perplexity()],
     )
     cbs = []
-    if args.distributed:
-        setup_distrib(args.local_rank)
-        cbs.append(FixedDistributedTrainer(args.local_rank))
     cbs.extend([DeepkitCallback(args, cfg, tokenizer)])
     learner.add_cbs(cbs)
-    if args.distributed and rank_distrib() > 0:
-        learner.remove_cb(learner.progress)
     return learner
 
 
@@ -191,9 +162,6 @@ def train(args, cfg, test_mode=False) -> Learner:
 
     args.experiment = experiment
 
-    args.distributed = args.local_rank != -1
-    args.main_process = args.local_rank in [-1, 0]
-
     run_tags = [
         cfg.model.name,
         "uncased" if cfg.vocab.lowercase else "cased",
@@ -221,23 +189,20 @@ def train(args, cfg, test_mode=False) -> Learner:
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
-        level=logging.INFO if args.main_process else logging.WARN,
+        level=logging.INFO,
     )
-    if args.main_process:
-        log.info(f"Pretraining ALBERT: {args}")
-        log.info(f"Configuration: {cfg.pretty()}")
-        log.info(f"Model device is {model.device}, loader device is {dls[0].device}")
 
-        if args.max_items:
-            log.info(f"Sentence pairs limited to {args.max_items}")
-        else:
-            log.info(f"Processing all sentence pairs")
-        log.warning(
-            "GPUs: %s, distributed training: %s, 16-bits training: %s",
-            torch.cuda.device_count(),
-            args.distributed,
-            args.fp16,
-        )
+    log.info(f"Pretraining ALBERT: {args}")
+    log.info(f"Configuration: {cfg.pretty()}")
+    log.info(f"Model device is {model.device}, loader device is {dls[0].device}")
+
+    if args.max_items:
+        log.info(f"Sentence pairs limited to {args.max_items}")
+    else:
+        log.info(f"Processing all sentence pairs")
+    log.warning(
+        "GPUs: %s, 16-bits training: %s", torch.cuda.device_count(), args.fp16,
+    )
 
     learn.fit_one_cycle(args.epochs, lr_max=cfg.training.learning_rate)
 

@@ -3,7 +3,7 @@ import torch
 import math
 import logging
 
-from fastai2.basics import Recorder, Callback, random, rank_distrib, num_distrib
+from fastai2.basics import Recorder, Callback, random
 from calbert.tokenizer import AlbertTokenizer
 from calbert.model import CalbertForMaskedLM
 
@@ -30,12 +30,7 @@ class DeepkitCallback(Callback):
     def begin_fit(self):
         # FIXME: look into why it doesn't work
         # self.experiment.watch_torch_model(self.learn.model)
-        self.valid_dl = self.dls.valid.new(
-            self.dls.valid_ds,
-            bs=self.n_preds,
-            rank=rank_distrib(),
-            world_size=num_distrib(),
-        )
+        self.valid_dl = self.dls.valid.new(self.dls.valid_ds, bs=self.n_preds,)
 
     def begin_epoch(self):
         self.batch = 0
