@@ -46,7 +46,20 @@ If you then teach it to classify tweets or documents into categories (or identif
 
 Because there are no language models in Catalan! And there's a lot of Catalan text to be processed. (In Catalonia).
 
-## Training calbert from scratch
+## Setup
+
+For dependency management we use [Poetry](https://python-poetry.org) (and Docker of course).
+
+
+```bash
+pip install -U poetry
+poetry install
+poetry shell
+```
+
+The production image to train the model is under `docker/`, and it's called `codegram/calbert`. It contains all the latest dependencies, but no code -- Deepkit will ship the code in every experiment (read on to learn more about Deepkit).
+
+## Dataset and tokenizers
 
 All config lives under `config`. There you can control parameters related to training, tokenizing, and everything, and even choose which version of the model to train.
 
@@ -54,39 +67,47 @@ All configuration is overridable, since it's [Hydra](https://hydra.cc) configura
 
 ### Getting the dataset
 
-You can download the whole dataset and get a small sample to play with locally:
+A tiny subset of the dataset lives under `dist/data` so that you can train a small model and do quick experiments locally.
+
+To download the full dataset and automatically split it in training / validation, just run this command:
 
 ```bash
-curl https://traces1.inria.fr/oscar/files/Compressed/ca_dedup.txt.gz -O data.txt.gz
-gunzip -c data.txt.gz | head -n 1000 > train.txt
-gunzip -c data.txt.gz | tail -n 200 > valid.txt
+python -m calbert download_data --out-dir dataset
 ```
 
-### Training the tokenizer
+### Re-training the tokenizers
 
-We're training the tokenizer only on the training set, not the validation set.
+The pretrained tokenizers are at `dist/tokenizer-{cased,uncased}`. They are trained only on the full training set.
+
+If you want to re-train the tokenizer (by default uncased):
 
 ```bash
-python -m calbert train_tokenizer --input-file train.txt --out-dir tokenizer
+python -m calbert train_tokenizer --input-file dataset/train.txt --out-dir tokenizer
 ```
 
-### Producing the dataset
-
-The dataset is basically a distillation of the raw text data into fixed-length sentences represented by a 4-tuple of tensors `(token_ids, special_tokens_mask, attention_mask, tensor_type_ids)`. Producing these tuples is computationally expensive so we have a separate step for it.
+To train the cased one, just override the appropriate Hydra configuration:
 
 ```bash
-python -m calbert dataset --train-file train.txt --valid-file valid.txt --tokenizer-dir tokenizer --out-dir dataset
+python -m calbert train_tokenizer --input-file dataset/train.txt --out-dir tokenizer vocab.lowercase=False
 ```
 
-### Training the model
+## Training and running experiments
+
+We use [Deepkit](https://deepkit.ai) to run and keep track of experiments. Download it for free for your platform of choice if you'd like to run locally, or check their docs to run against their free community server.
+
+### Training a test model
+
+To make sure everything works, let's train a test model with the actual Docker image in Deepkit:
 
 ```bash
-python -m calbert train_model --tokenizer-dir tokenizer --dataset-dir dataset --out-dir model --tensorboard-dir tensorboard
+deepkit run test.deepkit.yml
 ```
 
-Warning, this is really slow! You probably want to run the full thing on GPUs.
+By default it will train it in your local Deepkit instance, using your CPU. Read [their docs](https://deepkit.ai/documentation/getting-started) to learn how to customize your runs.
 
-### Distributed training
+### Training on multiple GPUs in a cluster
+
+(TODO)
 
 Adjust how many GPUs you have and make sure to tune your batch size in `launch.py`.
 
@@ -100,15 +121,10 @@ Once you have a trained model, you can export it to be used as a HuggingFace tra
 
 For example, let's imagine you trained a `base-uncased` model and you want to export it.
 
-Remember to override the configuration with your actual model size (`model=base` in this case), but don't worry if you forget --you'll get an error if there is any mismatch.
+Download the `export` folder from the outputs in your Deepkit run, and run:
 
 ```bash
-python -m calbert export --tokenizer-dir $PWD/calbert-tokenizer-uncased-512 --model-path $PWD/calbert-base-uncased-512.pth --out-dir $PWD/export model=base
-```
-
-Now log in to HuggingFace transformers and upload the `export` folder:
-
-```bash
+mv export calbert-base-uncased
 transformers-cli login
 transformers-cli upload export
 ```
