@@ -52,6 +52,12 @@ def training_args_cfg():
                     "training.learning_rate=5e-05",
                     "seed=42",
                     "model.name=test",
+                    "model.hidden_size=312",
+                    "model.embedding_size=64",
+                    "model.initializer_range=0.02",
+                    "model.intermediate_size=312",
+                    "model.max_position_embeddings=128",
+                    "model.num_attention_heads=4",
                     "vocab.lowercase=False",
                     "vocab.max_size=10",
                 ]
@@ -92,7 +98,7 @@ class TestTraining:
 
         assert predictions.shape == (cfg.training.max_seq_length, len(tok))
 
-        model.__class__ = model.CalbertForMaskedLM
+        model.__class__ = CalbertForMaskedLM
 
         learn.validate()
 
