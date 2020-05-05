@@ -5,6 +5,7 @@ import argparse
 import logging
 from functools import partial
 
+from fastprogress import fastprogress
 import deepkit
 import torch
 import torch.nn as nn
@@ -18,6 +19,7 @@ from fastai2.basics import (
 )
 from fastai2.callback import progress, schedule, fp16
 from fastai2.callback.all import SaveModelCallback, ReduceLROnPlateau
+from fastai2.distributed import rank_distrib, DistributedTrainer, distrib_ctx, num_distrib
 from fastai2.metrics import accuracy, Perplexity
 from fastai2.data.core import TfmdDL, DataLoaders, Datasets
 from fastai2.text.data import TensorText
@@ -34,6 +36,8 @@ from calbert.dataset import CalbertDataset, Tokenize, dataloaders as build_datal
 from calbert.model import CalbertForMaskedLM
 from calbert.tokenizer import AlbertTokenizer, load as load_tokenizer
 from calbert.utils import normalize_path
+
+fastprogress.MAX_COLS = 80
 
 log = logging.getLogger(__name__)
 
@@ -87,6 +91,11 @@ def arguments() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fp16", action="store_true", help="Whether to use 16-bit (mixed) precision",
     )
+    parser.add_argument(
+        "--gpu",
+        default=None,
+        type=int,
+    )
     return parser
 
 
@@ -122,7 +131,7 @@ def get_learner(
     dataloaders: DataLoaders,
     model: CalbertForMaskedLM,
     tokenizer: AlbertTokenizer,
-    test_mode=False,
+    use_deepkit=True,
 ) -> Learner:
     learner = Learner(
         dataloaders,
@@ -132,7 +141,7 @@ def get_learner(
         metrics=[Perplexity()],
     )
     cbs = []
-    if not test_mode:
+    if use_deepkit:
         cbs.extend([DeepkitCallback(args, cfg, tokenizer)])
     learner.add_cbs(cbs)
     return learner
@@ -146,8 +155,16 @@ def set_config(experiment, key, val):
             experiment.set_config(key, str(val))
 
 
-def train(args, cfg, test_mode=False) -> Learner:
-    if not test_mode:
+def train(args, cfg, use_deepkit=True) -> Learner:
+    if torch.cuda.is_available():
+        n_gpu = torch.cuda.device_count()
+        if args.gpu is None: args.gpu = list(range(n_gpu))[0] 
+        torch.cuda.set_device(args.gpu)
+    else:
+        n_gpu = None
+
+    use_deepkit = use_deepkit and rank_distrib() == 0
+    if use_deepkit:
         experiment = deepkit.experiment()
 
         for key, val in vars(args).items():
@@ -187,7 +204,7 @@ def train(args, cfg, test_mode=False) -> Learner:
         dataloaders=dls,
         model=model,
         tokenizer=tokenizer,
-        test_mode=test_mode,
+        use_deepkit=use_deepkit
     )
 
     if args.fp16:
@@ -199,23 +216,29 @@ def train(args, cfg, test_mode=False) -> Learner:
         level=logging.INFO,
     )
 
-    log.info(f"Pretraining ALBERT: {args}")
-    log.info(f"Configuration: {cfg.pretty()}")
     log.info(f"Model device is {model.device}, loader device is {dls[0].device}")
 
-    if args.max_items:
-        log.info(f"Sentence pairs limited to {args.max_items}")
-    else:
-        log.info(f"Processing all sentence pairs")
-    log.warning(
-        "GPUs: %s, 16-bits training: %s", torch.cuda.device_count(), args.fp16,
-    )
+    if rank_distrib() == 0:
+        log.info(f"Pretraining ALBERT: {args}")
+        log.info(f"Configuration: {cfg.pretty()}")
 
-    learn.fit_one_cycle(args.epochs, lr_max=cfg.training.learning_rate)
+        if args.max_items:
+            log.info(f"Sentence pairs limited to {args.max_items}")
+        else:
+            log.info(f"Processing all sentence pairs")
+        log.info(
+            "GPUs: %s, 16-bits training: %s", torch.cuda.device_count(), args.fp16,
+        )
+
+    if num_distrib() > 1:  DistributedTrainer.fup = True
+
+    with learn.distrib_ctx(cuda_id=args.gpu): # distributed traing requires "-m fastai2.launch"
+        log.info(f"Training in distributed data parallel context on GPU {args.gpu}")
+        learn.fit_one_cycle(args.epochs, lr_max=cfg.training.learning_rate)
 
     learn.model.eval()
 
-    if args.export_path and not test_mode:
+    if args.export_path:
         args.export_path = normalize_path(args.export_path)
         args.export_path.mkdir(parents=True, exist_ok=True)
         model_to_save = model.module if hasattr(model, "module") else model
@@ -223,7 +246,8 @@ def train(args, cfg, test_mode=False) -> Learner:
         torch.save(model_to_save.state_dict(), args.export_path / "pytorch_model.bin")
         model_to_save.config.to_json_file(args.export_path / "config.json")
         tokenizer.save_pretrained(args.export_path)
-        for file in args.export_path.glob("*"):
-            args.experiment.add_output_file(str(file))
+        if use_deepkit:
+            for file in args.export_path.glob("*"):
+                args.experiment.add_output_file(str(file))
 
     return learn

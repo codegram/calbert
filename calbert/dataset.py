@@ -154,13 +154,15 @@ def dataloaders(
         TfmdDL(
             train_ds,
             batch_size=args.train_batch_size,
-            num_workers=0,
+            num_workers=4,
             device=default_device(),
+            pin_memory=True,
         ),
         TfmdDL(
             valid_ds,
             batch_size=args.eval_batch_size,
-            num_workers=0,
+            num_workers=4,
             device=default_device(),
+            pin_memory=True,
         ),
     )

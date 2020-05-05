@@ -4,7 +4,7 @@ import sys
 import argparse
 from pathlib import Path
 
-from . import tokenizer, training, download_data
+from calbert import tokenizer, training, download_data
 
 log = logging.getLogger(__name__)
 
@@ -43,11 +43,17 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         log.error(f"Must provide valid command: {', '.join(VALID_COMMANDS)}")
         exit(-1)
+    gpu = None
+    if sys.argv[1].startswith('--gpu'):  # distributed training
+        gpu = sys.argv[1]
+        del sys.argv[1]
     cmd = sys.argv[1]
     if cmd not in VALID_COMMANDS:
         log.error(f"Invalid command {cmd}: must be one {', '.join(VALID_COMMANDS)}")
         exit(-1)
     del sys.argv[1]
+    if gpu:
+        sys.argv.append(gpu)
     args, override = parse(cmd)
     sys.argv = [sys.argv[0]] + override
     TASK_WITH_ARGS = (TASKS[cmd], args)

@@ -17,7 +17,7 @@ output:
 config:
   version: tiny
   # maxing out 16 GB of GPU ram in a P100
-  train_batch_size: 56
-  eval_batch_size: 96
+  train_batch_size: 52
+  eval_batch_size: 88
 
-command: python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path dist/data/train_subset.txt --valid-path dist/data/valid_subset.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --export-path export --fp16 model={{version}}
+command: python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path /data/calbert/train.txt --valid-path /data/calbert/valid.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --export-path export --fp16 model={{version}}
