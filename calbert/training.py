@@ -139,6 +139,7 @@ def get_learner(
     dataloaders: DataLoaders,
     model: CalbertForMaskedLM,
     tokenizer: AlbertTokenizer,
+    use_deepkit: False,
 ) -> Learner:
     learner = Learner(
         dataloaders,
@@ -148,7 +149,7 @@ def get_learner(
         metrics=[Perplexity()],
     )
     cbs = []
-    if args.deepkit:
+    if use_deepkit:
         cbs.extend([DeepkitCallback(args, cfg, tokenizer)])
     learner.add_cbs(cbs)
     return learner
@@ -207,7 +208,7 @@ def train(args, cfg) -> Learner:
     dls = dataloaders(args, cfg, tokenizer=tokenizer, max_items=args.max_items)
     dls.to(default_device())
 
-    learn = get_learner(args, cfg, dataloaders=dls, model=model, tokenizer=tokenizer)
+    learn = get_learner(args, cfg, dataloaders=dls, model=model, tokenizer=tokenizer, use_deepkit=use_deepkit)
 
     if args.fp16:
         learn = learn.to_fp16()
