@@ -19,7 +19,12 @@ from fastai2.basics import (
 )
 from fastai2.callback import progress, schedule, fp16
 from fastai2.callback.all import SaveModelCallback, ReduceLROnPlateau
-from fastai2.distributed import rank_distrib, DistributedTrainer, distrib_ctx, num_distrib
+from fastai2.distributed import (
+    rank_distrib,
+    DistributedTrainer,
+    distrib_ctx,
+    num_distrib,
+)
 from fastai2.metrics import accuracy, Perplexity
 from fastai2.data.core import TfmdDL, DataLoaders, Datasets
 from fastai2.text.data import TensorText
@@ -92,9 +97,7 @@ def arguments() -> argparse.ArgumentParser:
         "--fp16", action="store_true", help="Whether to use 16-bit (mixed) precision",
     )
     parser.add_argument(
-        "--gpu",
-        default=None,
-        type=int,
+        "--gpu", default=None, type=int,
     )
     return parser
 
@@ -158,7 +161,8 @@ def set_config(experiment, key, val):
 def train(args, cfg, use_deepkit=True) -> Learner:
     if torch.cuda.is_available():
         n_gpu = torch.cuda.device_count()
-        if args.gpu is None: args.gpu = list(range(n_gpu))[0] 
+        if args.gpu is None:
+            args.gpu = list(range(n_gpu))[0]
         torch.cuda.set_device(args.gpu)
     else:
         n_gpu = None
@@ -204,7 +208,7 @@ def train(args, cfg, use_deepkit=True) -> Learner:
         dataloaders=dls,
         model=model,
         tokenizer=tokenizer,
-        use_deepkit=use_deepkit
+        use_deepkit=use_deepkit,
     )
 
     if args.fp16:
@@ -225,14 +229,17 @@ def train(args, cfg, use_deepkit=True) -> Learner:
         if args.max_items:
             log.info(f"Sentence pairs limited to {args.max_items}")
         else:
-            log.info(f"Processing all sentence pairs")
+            log.info("Processing all sentence pairs")
         log.info(
             "GPUs: %s, 16-bits training: %s", torch.cuda.device_count(), args.fp16,
         )
 
-    if num_distrib() > 1:  DistributedTrainer.fup = True
+    if num_distrib() > 1:
+        DistributedTrainer.fup = True
 
-    with learn.distrib_ctx(cuda_id=args.gpu): # distributed traing requires "-m fastai2.launch"
+    with learn.distrib_ctx(
+        cuda_id=args.gpu
+    ):  # distributed traing requires "-m fastai2.launch"
         log.info(f"Training in distributed data parallel context on GPU {args.gpu}")
         learn.fit_one_cycle(args.epochs, lr_max=cfg.training.learning_rate)
 

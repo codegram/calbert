@@ -30,9 +30,16 @@ class DeepkitCallback(Callback):
         # self.experiment.watch_torch_model(self.learn.model)
         if self.run:
             self.total_examples = len(self.dls.train_ds)
-            self.total_batches = math.floor(self.total_examples / self.args.train_batch_size / self.gpus)
+            self.total_batches = math.floor(
+                self.total_examples / self.args.train_batch_size / self.gpus
+            )
             self.log_every_batches = self.total_batches / 25
-            self.valid_dl = self.dls.valid.new(self.dls.valid_ds, bs=self.n_preds, rank=rank_distrib(), world_size=num_distrib())
+            self.valid_dl = self.dls.valid.new(
+                self.dls.valid_ds,
+                bs=self.n_preds,
+                rank=rank_distrib(),
+                world_size=num_distrib(),
+            )
 
     def begin_epoch(self):
         self.experiment.iteration(self.epoch, total=self.args.epochs)
@@ -111,12 +118,16 @@ class DeepkitCallback(Callback):
             self.experiment.iteration(self.epoch + 1, total=self.args.epochs)
             name = f"model_{self.epoch}"
             self.learn.save(name)
-            self.experiment.add_output_file(str(self.learn.path / "models" / f"{name}.pth"))
+            self.experiment.add_output_file(
+                str(self.learn.path / "models" / f"{name}.pth")
+            )
 
     def after_fit(self):
         if self.run:
-            self.learn.save(f"final")
-            self.experiment.add_output_file(str(self.learn.path / "models" / "final.pth"))
+            self.learn.save("final")
+            self.experiment.add_output_file(
+                str(self.learn.path / "models" / "final.pth")
+            )
         self.run = True
 
     def _write_stats(self):
