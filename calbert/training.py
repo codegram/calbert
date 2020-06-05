@@ -97,6 +97,11 @@ def arguments() -> argparse.ArgumentParser:
         "--fp16", action="store_true", help="Whether to use 16-bit (mixed) precision",
     )
     parser.add_argument(
+        "--deepkit",
+        action="store_true",
+        help="Whether to log metrics and insights to Deepkit",
+    )
+    parser.add_argument(
         "--gpu", default=None, type=int,
     )
     return parser
@@ -134,7 +139,6 @@ def get_learner(
     dataloaders: DataLoaders,
     model: CalbertForMaskedLM,
     tokenizer: AlbertTokenizer,
-    use_deepkit=True,
 ) -> Learner:
     learner = Learner(
         dataloaders,
@@ -144,7 +148,7 @@ def get_learner(
         metrics=[Perplexity()],
     )
     cbs = []
-    if use_deepkit:
+    if args.deepkit:
         cbs.extend([DeepkitCallback(args, cfg, tokenizer)])
     learner.add_cbs(cbs)
     return learner
@@ -158,7 +162,7 @@ def set_config(experiment, key, val):
             experiment.set_config(key, str(val))
 
 
-def train(args, cfg, use_deepkit=True) -> Learner:
+def train(args, cfg) -> Learner:
     if torch.cuda.is_available():
         n_gpu = torch.cuda.device_count()
         if args.gpu is None:
@@ -168,7 +172,7 @@ def train(args, cfg, use_deepkit=True) -> Learner:
         n_gpu = None
         args.gpu = -1
 
-    use_deepkit = use_deepkit and rank_distrib() == 0
+    use_deepkit = args.deepkit and rank_distrib() == 0
     if use_deepkit:
         experiment = deepkit.experiment()
 
@@ -203,14 +207,7 @@ def train(args, cfg, use_deepkit=True) -> Learner:
     dls = dataloaders(args, cfg, tokenizer=tokenizer, max_items=args.max_items)
     dls.to(default_device())
 
-    learn = get_learner(
-        args,
-        cfg,
-        dataloaders=dls,
-        model=model,
-        tokenizer=tokenizer,
-        use_deepkit=use_deepkit,
-    )
+    learn = get_learner(args, cfg, dataloaders=dls, model=model, tokenizer=tokenizer)
 
     if args.fp16:
         learn = learn.to_fp16()

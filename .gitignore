@@ -7,6 +7,8 @@ runs/
 docker/pyproject.toml
 docker/poetry.lock
 docker/calbert
+docker/config
+docker/dist
 wandb/
 *.pkl
 final-checkpoint/
