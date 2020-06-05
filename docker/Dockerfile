@@ -17,9 +17,9 @@ RUN pip install -U pip && \
 RUN mkdir -p /workspace/calbert /workspace/config /workspace/dist
 
 COPY poetry.lock pyproject.toml /workspace/
-COPY calbert/* /workspace/calbert/
-COPY dist/* /workspace/dist/
-COPY config/* /workspace/config/
+COPY calbert /workspace/calbert/
+COPY dist /workspace/dist/
+COPY config /workspace/config/
 
 # Project initialization:
 RUN poetry config virtualenvs.create false \
