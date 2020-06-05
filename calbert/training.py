@@ -166,6 +166,7 @@ def train(args, cfg, use_deepkit=True) -> Learner:
         torch.cuda.set_device(args.gpu)
     else:
         n_gpu = None
+        args.gpu = -1
 
     use_deepkit = use_deepkit and rank_distrib() == 0
     if use_deepkit:

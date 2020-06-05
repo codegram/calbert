@@ -4,6 +4,7 @@ import tempfile
 import glob
 import argparse
 from pathlib import Path
+from typing import Tuple
 
 from transformers import AlbertTokenizer
 from omegaconf import OmegaConf
@@ -13,7 +14,7 @@ from calbert.tokenizer import arguments, train, load
 from .conftest import InputData, folder
 
 
-def train_tokenizer(in_and_out: (str, str)) -> (AlbertTokenizer, str):
+def train_tokenizer(in_and_out: Tuple[str, str]) -> Tuple[AlbertTokenizer, str]:
     input_file, outdir = in_and_out
     args, cfg = tokenizer_args_and_cfg(input_file, outdir)
 
@@ -23,7 +24,7 @@ def train_tokenizer(in_and_out: (str, str)) -> (AlbertTokenizer, str):
 
 def tokenizer_args_and_cfg(
     input_file: str, outdir: str
-) -> (argparse.Namespace, OmegaConf):
+) -> Tuple[argparse.Namespace, OmegaConf]:
     args = arguments().parse_args(["--input-file", input_file, "--out-dir", outdir])
     config = [
         "vocab.max_size=44",
@@ -55,15 +56,14 @@ class TestTokenizer:
         t, outdir = train_tokenizer(input_file_and_outdir)
 
         tokens = t.tokenize("Hola, com anem? Tot bé?")
+        print(tokens)
         assert tokens == [
             "▁",
             "h",
             "o",
-            "l",
-            "a",
+            "la",
             ",",
-            "▁",
-            "c",
+            "▁c",
             "o",
             "m",
             "▁",
@@ -110,8 +110,8 @@ class TestTokenizer:
         got = list(glob.glob(outdir + "*"))
         got.sort()
         expected = [
-            outdir + f".vocab",
-            outdir + f".model",
+            outdir + ".vocab",
+            outdir + ".model",
         ]
         expected.sort()
         assert got == expected

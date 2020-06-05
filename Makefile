@@ -13,7 +13,7 @@ test:
 	poetry run py.test tests
 
 lint:
-	poetry run flake8 calbert/*.py
+	poetry run flake8 calbert/*.py tests/*.py
 
 clean:
 	rm -fr run calbert/__pycache__

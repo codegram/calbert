@@ -73,7 +73,7 @@ class TestTraining:
     def test_process(self, training_args_cfg):
         args, cfg, tok = training_args_cfg
 
-        learn = training.train(args, cfg, test_mode=True)
+        learn = training.train(args, cfg, use_deepkit=False)
 
         model = learn.model
 

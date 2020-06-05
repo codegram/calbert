@@ -7,7 +7,6 @@ from fastai2.data.all import DataLoader, TfmdDL, Datasets, Transform, stop
 from fastai2.text.data import TensorText
 from fastai2.basics import L
 
-# from fastai2.text.all import *
 from .conftest import InputData, folder
 from .tokenizer_test import train_tokenizer
 
@@ -19,7 +18,7 @@ def dataset():
 
 
 @pytest.fixture(scope="module")
-def tokenizer(which="train") -> (str, str):
+def tokenizer(which="train"):
     with InputData(which) as train_file:
         with folder() as outdir:
             yield train_tokenizer((train_file, outdir))[0]
@@ -62,7 +61,7 @@ class TestTokenization:
         train_ds = Datasets(ds, tfms=tfms)
 
         encoded = next(iter(train_ds))[0][0]
-        assert train_ds.decode([TensorText(encoded)]) == ("port d'a",)
+        assert train_ds.decode([TensorText(encoded)]) == ("port d'al",)
 
 
 @pytest.mark.describe("dataset.Mask")
