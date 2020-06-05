@@ -14,7 +14,7 @@ WORKDIR /workspace
 RUN pip install -U pip && \
     pip install --no-cache-dir poetry==${POETRY_VERSION}
 
-COPY poetry.lock pyproject.toml /workspace/
+COPY poetry.lock pyproject.toml calbert /workspace/
 
 # Project initialization:
 RUN poetry config virtualenvs.create false \

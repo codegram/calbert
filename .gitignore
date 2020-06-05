@@ -6,6 +6,7 @@ runs/
 *.txt
 docker/pyproject.toml
 docker/poetry.lock
+docker/calbert
 wandb/
 *.pkl
 final-checkpoint/

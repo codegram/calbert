@@ -1,9 +1,13 @@
 deps: pyproject.toml
 	poetry install
 
-docker: 
+docker-prepare:
 	cp pyproject.toml docker
 	cp poetry.lock docker
+	mkdir -p docker/calbert
+	cp calbert/*.py docker/calbert
+
+docker-build: docker-prepare
 	docker build -t codegram/calbert ./docker
 
 docker-push:
