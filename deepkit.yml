@@ -24,5 +24,5 @@ tasks:
     command: python -m calbert download_data --out-dir /data/calbert
 
   train:
-    command: python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path /data/calbert/train.txt --valid-path /data/calbert/valid.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --fp16 --export-path export model={{version}}
+    command: python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path /data/calbert/train.txt --valid-path /data/calbert/valid.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --fp16 --deepkit --export-path export model={{version}}
     depends_on: [download_data]

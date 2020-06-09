@@ -20,4 +20,4 @@ config:
   train_batch_size: 52
   eval_batch_size: 88
 
-command: python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path /data/calbert/train.txt --valid-path /data/calbert/valid.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --export-path export --fp16 model={{version}}
+command: python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path /data/calbert/train.txt --valid-path /data/calbert/valid.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --export-path export --fp16 --deepkit model={{version}}
