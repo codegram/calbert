@@ -1,7 +1,5 @@
 # calbert ![](https://github.com/codegram/calbert/workflows/Tests/badge.svg)
 
-`Warning! This is pre-alpha code! Run at your own risk :)`
-
 A Catalan ALBERT (A Lite BERT), Google's take on self-supervised learning of language representations.
 
 It's trained on a corpus of **19.557.475 sentence pairs** (containing 729 million unique words) extracted from the Catalan subset of [Inria's OSCAR](https://traces1.inria.fr/oscar/) dataset. We use the a validation set of 833.259 sentence pairs to evaluate the model.
