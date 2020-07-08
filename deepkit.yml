@@ -2,7 +2,7 @@ image: codegram/calbert:latest
 
 docker:
   binds:
-    - "/mnt/calbert-i1-workspace:/workspace"
+    - "/data:~/data"
 
 files:
   - config
@@ -20,5 +20,8 @@ config:
   eval_batch_size: 40
 
 tasks:
+  download_data:
+    command: python -m calbert download_data --out-dir /data
+
   train:
-    command: python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path /workspace/data/train.txt --valid-path /workspace/data/valid.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --fp16 --deepkit --export-path /workspace/export model={{version}}
+    command: python -m calbert train --tokenizer-path dist/tokenizer-uncased/ca.uncased.30000.model --train-path /data/train.txt --valid-path /data/valid.txt --train-batch-size {{train_batch_size}} --eval-batch-size {{eval_batch_size}} --fp16 --deepkit --export-path /workspace/export model={{version}}
