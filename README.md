@@ -6,6 +6,87 @@ It's trained on a corpus of **19.557.475 sentence pairs** (containing 729 millio
 
 You can read the original [ALBERT paper here](https://arxiv.org/pdf/1909.11942.pdf).
 
+## Pre-trained models
+
+They are available at HuggingFace's [Model Hub page](https://huggingface.co/codegram)
+
+| Model                               | Arch.          | Training data          | Play with it                                                              | Visualize it                                                                                                                                                      |
+| ----------------------------------- | -------------- | ---------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `codegram` / `calbert-tiny-uncased` | Tiny (uncased) | OSCAR (4.3 GB of text) | [Card on Model Hub](https://huggingface.co/codegram/calbert-tiny-uncased) | [Visualize in exBERT](https://huggingface.co/exbert/?model=codegram/calbert-tiny-uncased&modelKind=bidirectional&sentence=M%27agradaria%20força%20saber-ne%20més) |
+| `codegram` / `calbert-base-uncased` | Base (uncased) | OSCAR (4.3 GB of text) | [Card on Model Hub](https://huggingface.co/codegram/calbert-base-uncased) | [Visualize in exBERT](https://huggingface.co/exbert/?model=codegram/calbert-base-uncased&modelKind=bidirectional&sentence=M%27agradaria%20força%20saber-ne%20més) |
+
+## How to use it?
+
+You just need the `transformers` library. Nothing else to clone or install.
+
+To choose which model version to use (`tiny`, or `base`), consider that smaller models are less powerful, but nimbler and less resource-hungry to run.
+
+```bash
+pip install transformers
+```
+
+```python
+from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("codegram/calbert-base-uncased")
+model = AutoModel.from_pretrained("codegram/calbert-base-uncased")
+
+model.eval() # disable dropout
+```
+
+Now onto the two main use cases that you can do.
+
+### Predicting a missing word in a Catalan sentence
+
+This is the simplest use case, yet not the most useful. Still, here it is! Whatever words you want to mask, use the special token `[MASK]` to indicate it. The model will output the most likely candidates for the masked word.
+
+```python
+from transformers import pipeline
+
+calbert_fill_mask  = pipeline("fill-mask", model="codegram/calbert-base-uncased", tokenizer="codegram/calbert-base-uncased")
+results = calbert_fill_mask("M'agrada [MASK] això")
+# results
+# [{'sequence': "[CLS] m'agrada molt aixo[SEP]", 'score': 0.614592969417572, 'token': 61},
+#  {'sequence': "[CLS] m'agrada moltíssim aixo[SEP]", 'score': 0.06058056280016899, 'token': 4867},
+#  {'sequence': "[CLS] m'agrada més aixo[SEP]", 'score': 0.017195818945765495, 'token': 43},
+#  {'sequence': "[CLS] m'agrada llegir aixo[SEP]", 'score': 0.016321714967489243, 'token': 684},
+#  {'sequence': "[CLS] m'agrada escriure aixo[SEP]", 'score': 0.012185849249362946, 'token': 1306}]
+```
+
+### Extracting a feature vector from a Catalan sentence or document
+
+The extracted feature vector can be used to index documents as dense vectors in ElasticSearch for example, and perform similarity searches.
+
+Another use case is _Natural Language Understanding_ --using these vectors as abstract representations of documents/sentences that can be used as input to other downstream models such as classifiers.
+
+Here's how to extract the vectors from a sentence or document:
+
+```python
+import torch
+# Tokenize in sub-words with SentencePiece
+tokenized_sentence = tokenizer.tokenize("M'és una mica igual")
+# ['▁m', "'", 'es', '▁una', '▁mica', '▁igual']
+
+# 1-hot encode and add special starting and end tokens
+encoded_sentence = tokenizer.encode(tokenized_sentence)
+# [2, 109, 7, 71, 36, 371, 1103, 3]
+# NB: Can be done in one step : tokenize.encode("M'és una mica igual")
+
+# Feed tokens to Calbert as a torch tensor (batch dim 1)
+encoded_sentence = torch.tensor(encoded_sentence).unsqueeze(0)
+embeddings, _ = model(encoded_sentence)
+embeddings.size()
+# torch.Size([1, 8, 768])
+embeddings.detach()
+# tensor([[[-0.0261,  0.1166, -0.1075,  ..., -0.0368,  0.0193,  0.0017],
+#          [ 0.1289, -0.2252,  0.9881,  ..., -0.1353,  0.3534,  0.0734],
+#          [-0.0328, -1.2364,  0.9466,  ...,  0.3455,  0.7010, -0.2085],
+#          ...,
+#          [ 0.0397, -1.0228, -0.2239,  ...,  0.2932,  0.1248,  0.0813],
+#          [-0.0261,  0.1165, -0.1074,  ..., -0.0368,  0.0193,  0.0017],
+#          [-0.1934, -0.2357, -0.2554,  ...,  0.1831,  0.6085,  0.1421]]])
+```
+
 ## Credits
 
 This is part of the applied research we do at [Codegram](https://codegram.com) (who is to thank for the time and the compute!).
